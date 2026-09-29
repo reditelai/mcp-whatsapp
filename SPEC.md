@@ -150,8 +150,15 @@ zařízením se navzájem shazují. Proto:
 
 - **Uloží se jen zprávy z chatů, které smí číst**, i vlastní zprávy odeslané
   z telefonu (asistent pak vidí celý rozhovor).
-- **Média se stahují hned při příchodu** do `media/` v datové složce. Odkazy
-  WhatsAppu po čase vyprší.
+- **Média se stahují hned při příchodu** (odkazy WhatsAppu po čase vyprší) do
+  `media_dir`, v Miládce `vstupy/whatsapp/<jméno chatu>/<datum>_<čas>_<druh>.<přípona>`,
+  čitelně pro člověka (Karel, 29. 9. 2026). `vstupy/` je v `.gitignore`.
+  Cesty se v databázi drží relativně ke složce médií, přesun vaultu je
+  nerozbije.
+- **Úklid:** média starší než `media_keep_days` (výchozí 30, `0` = nikdy)
+  server jednou denně smaže - jen soubory, které sám uložil, a jen ve své
+  složce médií. Text zprávy a přepis zůstanou. Co má zůstat, Miládka přesune
+  do `zdroje/`.
 - **`wa_new_messages`** vrátí zprávy nové nebo změněné od kurzoru a nový
   kurzor. Změna je úprava nebo smazání pro všechny: zpráva přijde znovu se
   stejným `id`. Kurzor je čítač změn (`rev`), drží ho klient (vzor kotvy

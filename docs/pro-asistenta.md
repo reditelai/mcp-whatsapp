@@ -28,24 +28,27 @@ udělat bez něj, uděláš sama, a řekneš mu jen to, co musí on.
 do skryté podsložky `.doplnky/` v kořeni vaultu (dál `VAULT`):
 
 ```
-VAULT/.doplnky/mcp-whatsapp/     binárka, SHA256SUMS a data (klíče, zprávy, média)
+VAULT/.doplnky/mcp-whatsapp/     binárka, SHA256SUMS a data (klíče, databáze zpráv)
 VAULT/.doplnky/prepis/           přepis hlasovek, sdílený s dalšími doplňky
+VAULT/vstupy/whatsapp/           fotky, hlasovky a dokumenty ze zpráv, po chatech
 VAULT/.miladka/secrets/whatsapp/ config.json
 ```
 
 Uživatel pak Miládku přestěhuje nebo zazálohuje jednou složkou. Obsidian
 složky s tečkou nezobrazuje.
 
-**Než cokoli stáhneš, ověř, že `.doplnky/` je v `.gitignore` vaultu.** Budou
-v ní klíče k WhatsAppu a ty do zálohy nesmí nikdy:
+**Než cokoli stáhneš, ověř, že `.doplnky/` a `vstupy/` jsou v `.gitignore`
+vaultu.** V `.doplnky` budou klíče k WhatsAppu a ty do zálohy nesmí nikdy,
+`vstupy/` je průchozí složka a média by zálohu nafoukla:
 
 ```sh
-cd VAULT && mkdir -p .doplnky && git check-ignore -v .doplnky/x
+cd VAULT && mkdir -p .doplnky && git check-ignore -v .doplnky/x vstupy/x
 ```
 
-Když příkaz nic nevypíše (nebo vault není v gitu, ale záloha se zapnout
-může), přidej do `VAULT/.gitignore` řádek `.doplnky/` a ověř znovu. Od verze
-balíčku, která `.doplnky` zavádí, tam řádek je.
+Musí vypsat oba řádky. Když některý chybí (nebo vault není v gitu, ale
+záloha se zapnout může), přidej do `VAULT/.gitignore` chybějící `.doplnky/`
+nebo `vstupy/` a ověř znovu. Od verze balíčku, která `.doplnky` zavádí, tam
+oba řádky jsou.
 
 Zjisti systém:
 
@@ -92,8 +95,11 @@ Zeptej se po jednom:
    spárování, JID ukáže `wa_list_chats`.
 3. **Komu smíš psát?** Doporuč: jen vyjmenovaným číslům, třeba jemu samotnému.
    `"all"` jen na jeho výslovné přání.
-4. **Posílání souborů?** Doporuč: jen z vaultu (celá cesta ke složce vaultu
-   do `send.files`), nebo vůbec.
+4. **Posílání souborů?** Doporuč: jen z vaultu (`send.files: ["."]`, cesty
+   se berou od kořene vaultu), nebo vůbec.
+5. **Fotky a hlasovky** se ukládají do `vstupy/whatsapp/` a **po 30 dnech se
+   mažou** (text zpráv a přepisy hlasovek zůstanou). Řekni mu to. Chce jinou
+   dobu, nebo nemazat (`0`)? Co má zůstat napořád, přesuneš do `zdroje/`.
 
 ### A4. `config.json`
 
@@ -104,14 +110,16 @@ je v `.gitignore`, ověř `git check-ignore -v`).
 {
   "read": { "chats": "all", "groups": false },
   "send": { "chats": ["+420777123456"], "groups": false, "files": [] },
+  "media_dir": "vstupy/whatsapp",
+  "media_keep_days": 30,
   "history_sync": false,
   "device_name": "Miládka"
 }
 ```
 
+Cesty v configu se berou **od kořene vaultu**, takže se stěhují s ním.
 `data_dir` ani `transcription.dir` nenastavuj: server si data dá vedle
-binárky (`.doplnky/mcp-whatsapp/data`) a přepis do `.doplnky/prepis`, takže
-se stěhují s vaultem. Zkontroluj ho (z kořene vaultu):
+binárky (`.doplnky/mcp-whatsapp/data`) a přepis do `.doplnky/prepis`. Zkontroluj ho (z kořene vaultu):
 
 ```sh
 cd VAULT && .doplnky/mcp-whatsapp/SOUBOR --config .miladka/secrets/whatsapp/config.json --check
@@ -219,6 +227,11 @@ Na slabém stroji (4 GB paměti a méně) navrhni v `config.json`
      co sis z ní zapsala.
    - **`from_me: true`** je zpráva, kterou poslal uživatel (nebo ty). Je to
      kontext rozhovoru, ne nové zadání.
+   - **Média** (fotka, hlasovka, dokument) jsou v `media_path`, ve složce
+     `vstupy/whatsapp/<chat>/` s datem v názvu. Po `media_keep_days` (výchozí
+     30) je server smaže a `media_path` zmizí; text a přepis zůstanou. Co má
+     zůstat (smlouva, fotka k projektu), **přesuň do `zdroje/`** a odkaž na ni
+     z poznámky, jako u jiných vstupů.
    - **Hlasovka** přijde nejdřív s `transcript_status: "pending"` a za chvíli
      znovu se stejným `id` a textem v `transcript`. Ber ji podle přepisu, ale
      **jména, čísla a termíny** si u uživatele potvrď, když na nich záleží -

@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -30,6 +32,55 @@ func DSN(path string) string {
 // Store is app.db.
 type Store struct {
 	db *sql.DB
+	// Media paths are stored relative to the media folder, so that moving
+	// Miládka's folder does not break them. legacy holds folders where
+	// older versions kept media under absolute paths (0.1.x: data/media).
+	mediaBase string
+	legacy    []string
+}
+
+// SetMediaBase sets the media folder and older media folders.
+func (s *Store) SetMediaBase(dir string, legacy ...string) {
+	s.mediaBase, s.legacy = dir, legacy
+}
+
+func (s *Store) relMedia(p string) string {
+	if p == "" || s.mediaBase == "" {
+		return p
+	}
+	if rel, err := filepath.Rel(s.mediaBase, p); err == nil && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel) {
+		return filepath.ToSlash(rel)
+	}
+	return p
+}
+
+func (s *Store) absMedia(p string) string {
+	if p == "" {
+		return ""
+	}
+	if !filepath.IsAbs(p) {
+		return filepath.Join(s.mediaBase, filepath.FromSlash(p))
+	}
+	if _, err := os.Stat(p); err == nil {
+		return p
+	}
+	// An absolute path from an older version whose data folder moved: look
+	// for the same chat/file under the current folders.
+	tail := filepath.Join(filepath.Base(filepath.Dir(p)), filepath.Base(p))
+	for _, dir := range append([]string{s.mediaBase}, s.legacy...) {
+		if dir == "" {
+			continue
+		}
+		if c := filepath.Join(dir, tail); fileExists(c) {
+			return c
+		}
+	}
+	return p
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }
 
 // Open opens (and migrates) app.db.
@@ -246,13 +297,13 @@ func (s *Store) DeleteMessage(ctx context.Context, chat, id string) (mediaPath s
 		return "", false, err
 	}
 	n, _ := res.RowsAffected()
-	return mediaPath, n > 0, nil
+	return s.absMedia(mediaPath), n > 0, nil
 }
 
 // SetMediaPath records where the downloaded media file is.
 // A deleted message keeps no media: the update does not apply to it.
 func (s *Store) SetMediaPath(ctx context.Context, chat, id, path string) (bool, error) {
-	res, err := s.db.ExecContext(ctx, `UPDATE messages SET media_path = ? WHERE chat_jid = ? AND id = ? AND deleted = 0`, path, chat, id)
+	res, err := s.db.ExecContext(ctx, `UPDATE messages SET media_path = ? WHERE chat_jid = ? AND id = ? AND deleted = 0`, s.relMedia(path), chat, id)
 	if err != nil {
 		return false, err
 	}
@@ -263,6 +314,14 @@ func (s *Store) SetMediaPath(ctx context.Context, chat, id, path string) (bool, 
 const msgCols = `rev, chat_jid, id, sender_jid, sender_phone, sender_name, from_me, ts, kind, text,
 	quoted_id, media_mime, media_name, media_size, media_path, edited, deleted, media_ref, raw_chat, raw_sender,
 	transcript, transcript_status`
+
+func (s *Store) scanMessages(rows *sql.Rows) ([]Message, error) {
+	ms, err := scanMessages(rows)
+	for i := range ms {
+		ms[i].MediaPath = s.absMedia(ms[i].MediaPath)
+	}
+	return ms, err
+}
 
 func scanMessages(rows *sql.Rows) ([]Message, error) {
 	defer rows.Close()
@@ -297,7 +356,7 @@ func (s *Store) GetMessage(ctx context.Context, chat, id string) (*Message, erro
 	if err != nil {
 		return nil, err
 	}
-	ms, err := scanMessages(rows)
+	ms, err := s.scanMessages(rows)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +384,7 @@ func (s *Store) ChatMessages(ctx context.Context, chat string, before time.Time,
 	if err != nil {
 		return nil, err
 	}
-	return scanMessages(rows)
+	return s.scanMessages(rows)
 }
 
 // After returns messages new or changed (edited, deleted) after cursor,
@@ -335,7 +394,7 @@ func (s *Store) After(ctx context.Context, cursor int64, limit int) ([]Message, 
 	if err != nil {
 		return nil, err
 	}
-	return scanMessages(rows)
+	return s.scanMessages(rows)
 }
 
 // Latest returns the newest limit messages, oldest first.
@@ -344,7 +403,23 @@ func (s *Store) Latest(ctx context.Context, limit int) ([]Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	return scanMessages(rows)
+	return s.scanMessages(rows)
+}
+
+// ExpiredMedia returns messages with a downloaded file older than before.
+func (s *Store) ExpiredMedia(ctx context.Context, before time.Time, limit int) ([]Message, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+msgCols+` FROM messages WHERE media_path <> '' AND ts < ? ORDER BY ts LIMIT ?`, before.Unix(), limit)
+	if err != nil {
+		return nil, err
+	}
+	return s.scanMessages(rows)
+}
+
+// ClearMediaPath forgets the file of a message (it was removed); the text
+// and the transcript stay.
+func (s *Store) ClearMediaPath(ctx context.Context, chat, id string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE messages SET media_path = '', media_ref = NULL WHERE chat_jid = ? AND id = ?`, chat, id)
+	return err
 }
 
 // SetTranscript stores a voice note transcript (or its state). A finished
@@ -367,7 +442,7 @@ func (s *Store) VoiceBacklog(ctx context.Context, since time.Time, limit int) ([
 	if err != nil {
 		return nil, err
 	}
-	return scanMessages(rows)
+	return s.scanMessages(rows)
 }
 
 // MaxRev returns the current end of the change log.
@@ -405,7 +480,7 @@ func (s *Store) Search(ctx context.Context, query, chat string, since, until tim
 	if err != nil {
 		return nil, err
 	}
-	return scanMessages(rows)
+	return s.scanMessages(rows)
 }
 
 func prefixed(cols, p string) string {

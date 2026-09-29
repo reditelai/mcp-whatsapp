@@ -74,10 +74,13 @@ S Miládkou to všechno udělá asistent podle `docs/pro-asistenta.md`.
 | `device_name` | jméno zařízení v telefonu v Propojených zařízeních |
 | `transcription.enabled` | přepis hlasovek; výchozí `true`, platí až po instalaci (`wa_transcription_setup`) |
 | `transcription.threads`, `transcription.batch` | vlákna a počet úseků najednou; výchozí 2 a 2 (asi 1,3 GB paměti). Na slabém stroji `batch: 1` |
+| `media_dir` | kam se ukládají fotky, hlasovky a dokumenty; výchozí `data/media`, s Miládkou `vstupy/whatsapp` |
+| `media_keep_days` | po kolika dnech se stažená média smažou (text a přepis zůstanou); výchozí 30, `0` = nikdy |
 | `data_dir` | kde leží data serveru; výchozí `data/` vedle binárky |
 | `transcription.dir` | engine a model přepisu; výchozí `.doplnky/prepis` (sdílený s dalšími doplňky Miládky), jinde `data/stt` |
 
-**Prázdný seznam i chybějící klíč znamená nikam**, ne kamkoli.
+**Prázdný seznam i chybějící klíč znamená nikam**, ne kamkoli. Relativní
+cesty se v Miládce berou od kořene její složky, jinde od složky s `config.json`.
 
 V datové složce je `session.db` s klíči spárovaného zařízení. **Kdo má ten
 soubor, má přístup k tvému WhatsAppu.** Nepatří do gitu ani do zálohy.

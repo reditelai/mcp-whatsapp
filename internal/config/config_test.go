@@ -41,7 +41,12 @@ func TestDefaultDirs(t *testing.T) {
 		t.Fatalf("plain folder: %s %s", c.DataDir, c.Transcription.Dir)
 	}
 	c, _ = parseWith([]byte(`{"data_dir":"d","transcription":{"dir":"/x/prepis"}}`), "/h/c/config.json", "/h/bin")
-	if c.DataDir != "/h/c/d" || c.Transcription.Dir != "/x/prepis" {
-		t.Fatalf("explicit: %s %s", c.DataDir, c.Transcription.Dir)
+	if c.DataDir != "/h/c/d" || c.Transcription.Dir != "/x/prepis" || c.MediaDir != "/h/c/d/media" || c.MediaKeep != 30 {
+		t.Fatalf("explicit: %+v", c)
+	}
+	// In Miládka's add-on folder relative paths start at her folder.
+	c, err = parseWith([]byte(`{"media_dir":"vstupy/whatsapp","media_keep_days":0,"send":{"files":["poznamky"]}}`), "/v/.miladka/secrets/whatsapp/config.json", "/v/.doplnky/mcp-whatsapp")
+	if err != nil || c.MediaDir != "/v/vstupy/whatsapp" || c.MediaKeep != 0 || len(c.Send.FileDirs) != 1 || c.Send.FileDirs[0] != "/v/poznamky" {
+		t.Fatalf("vault relative: %v %+v", err, c)
 	}
 }

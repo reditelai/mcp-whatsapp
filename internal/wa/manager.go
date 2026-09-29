@@ -84,13 +84,14 @@ type Manager struct {
 
 // NewManager prepares the data folder and app.db. It does not connect.
 func NewManager(cfg *config.Config, log waLog.Logger) (*Manager, error) {
-	if err := os.MkdirAll(filepath.Join(cfg.DataDir, "media"), 0o700); err != nil {
+	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("Datová složka %s nejde založit: %v", cfg.DataDir, err)
 	}
 	st, err := appstore.Open(filepath.Join(cfg.DataDir, "app.db"))
 	if err != nil {
 		return nil, fmt.Errorf("Databáze zpráv v %s nejde otevřít: %v", cfg.DataDir, err)
 	}
+	st.SetMediaBase(cfg.MediaDir, filepath.Join(cfg.DataDir, "media"))
 	return &Manager{
 		cfg:        cfg,
 		log:        log,
@@ -221,6 +222,7 @@ func (m *Manager) startSession(ctx context.Context) {
 	}
 	m.newClient(device)
 	m.startTranscriber(ctx)
+	go m.cleanMedia(ctx)
 	m.mu.Lock()
 	paired := m.cli.Store.ID != nil
 	m.mu.Unlock()

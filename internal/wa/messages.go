@@ -2,6 +2,7 @@ package wa
 
 import (
 	"context"
+	"fmt"
 	"mime"
 	"os"
 	"path/filepath"
@@ -395,7 +396,63 @@ func (m *Manager) fetchGroupName(cli *whatsmeow.Client, jid types.JID) {
 	}()
 }
 
-var unsafeName = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+// Forbidden in file names on Windows, macOS or Linux.
+var unsafeName = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1f]+`)
+
+// kindNames are the Czech words in media file names: the folder is for the
+// user too (vstupy/whatsapp/ in Miládka's folder).
+var kindNames = map[string]string{
+	"image": "fotka", "video": "video", "voice": "hlasovka", "audio": "zvuk",
+	"sticker": "nalepka", "video_note": "videozprava", "document": "dokument",
+}
+
+// mediaPath is <media_dir>/<chat name or number>/<date>_<time>_<kind or file name>.<ext>,
+// readable by a person browsing the folder.
+func (m *Manager) mediaPath(ctx context.Context, msg *appstore.Message) (string, error) {
+	folder := strings.SplitN(msg.Chat, "@", 2)[0]
+	if c, err := m.st.ChatByJID(ctx, msg.Chat); err == nil {
+		switch {
+		case c.Name != "":
+			folder = c.Name
+		case c.Phone != "":
+			folder = "+" + c.Phone
+		}
+	}
+	folder = safeName(folder, 60)
+	dir := filepath.Join(m.cfg.MediaDir, folder)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
+	stamp := msg.Timestamp().Local().Format("2006-01-02_1504")
+	ext := extFor(msg.MediaMime, msg.MediaName)
+	label := kindNames[msg.Kind]
+	if msg.MediaName != "" {
+		label = strings.TrimSuffix(msg.MediaName, filepath.Ext(msg.MediaName))
+	}
+	if label == "" {
+		label = msg.Kind
+	}
+	base := stamp + "_" + safeName(label, 80)
+	path := filepath.Join(dir, base+ext)
+	for i := 2; ; i++ {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return path, nil
+		}
+		path = filepath.Join(dir, fmt.Sprintf("%s_%d%s", base, i, ext))
+	}
+}
+
+func safeName(s string, max int) string {
+	s = strings.TrimSpace(unsafeName.ReplaceAllString(s, "_"))
+	s = strings.Trim(s, ". ")
+	if r := []rune(s); len(r) > max {
+		s = string(r[:max])
+	}
+	if s == "" {
+		s = "_"
+	}
+	return s
+}
 
 // DownloadMedia returns the path of a message's media file, downloading it
 // first when needed.
@@ -449,12 +506,10 @@ func (m *Manager) downloadMedia(ctx context.Context, chat, id string) (string, e
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(m.cfg.DataDir, "media", unsafeName.ReplaceAllString(strings.SplitN(chat, "@", 2)[0], "_"))
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	path, err := m.mediaPath(ctx, msg)
+	if err != nil {
 		return "", err
 	}
-	name := unsafeName.ReplaceAllString(id, "_") + extFor(msg.MediaMime, msg.MediaName)
-	path := filepath.Join(dir, name)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return "", err
 	}

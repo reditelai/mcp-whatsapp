@@ -85,3 +85,32 @@ func TestMigrateAddsRev(t *testing.T) {
 		t.Fatalf("migration: %v %+v", err, after)
 	}
 }
+
+func TestRelativeMedia(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	s, err := Open(filepath.Join(dir, "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	media := filepath.Join(dir, "vault", "vstupy", "whatsapp")
+	s.SetMediaBase(media)
+	s.SaveMessage(ctx, NewMessage{Chat: "c", ChatKind: "direct", ID: "a", Time: time.Now(), Kind: "voice"})
+	abs := filepath.Join(media, "Jana", "2026-09-29_1415_hlasovka.ogg")
+	if ok, err := s.SetMediaPath(ctx, "c", "a", abs); err != nil || !ok {
+		t.Fatal(err)
+	}
+	var raw string
+	s.db.QueryRow(`SELECT media_path FROM messages WHERE id = 'a'`).Scan(&raw)
+	if raw != "Jana/2026-09-29_1415_hlasovka.ogg" {
+		t.Fatalf("stored %q", raw)
+	}
+	// The folder moves: the path follows.
+	moved := filepath.Join(dir, "elsewhere", "vstupy", "whatsapp")
+	s.SetMediaBase(moved)
+	m, _ := s.GetMessage(ctx, "c", "a")
+	if m.MediaPath != filepath.Join(moved, "Jana", "2026-09-29_1415_hlasovka.ogg") {
+		t.Fatalf("after move %q", m.MediaPath)
+	}
+}

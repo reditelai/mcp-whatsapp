@@ -28,7 +28,9 @@ type Scope struct {
 // Config is the validated server configuration.
 type Config struct {
 	Path        string // absolute path of the loaded file
-	DataDir     string // session.db, app.db, media/, lock
+	DataDir     string // session.db, app.db, lock
+	MediaDir    string // downloaded photos, voice notes, documents
+	MediaKeep   int    // days to keep downloaded media; 0 = forever
 	Read        Scope
 	Send        Scope
 	HistorySync bool
@@ -68,6 +70,8 @@ type rawScope struct {
 
 type rawConfig struct {
 	DataDir     string    `json:"data_dir"`
+	MediaDir    string    `json:"media_dir"`
+	MediaKeep   *int      `json:"media_keep_days"`
 	Read        *rawScope `json:"read"`
 	Send        *rawScope `json:"send"`
 	HistorySync bool      `json:"history_sync"`
@@ -127,7 +131,19 @@ func parseWith(data []byte, path, bin string) (*Config, error) {
 	// Everything of the server lives next to its binary, so that in Miládka
 	// it all stays inside her folder (<vault>/.doplnky/mcp-whatsapp/) and
 	// moves with it (Karel, 29. 9. 2026: "vše mám v jedné složce").
-	cfg.DataDir = resolve(raw.DataDir, path, filepath.Join(bin, "data"))
+	// Relative paths in the config are taken from the root of Miládka's
+	// folder when the server lives in her add-on folder, so that the whole
+	// setup moves with it; elsewhere from the config file's folder.
+	base := filepath.Dir(path)
+	if parent := filepath.Dir(bin); addonsDirs[filepath.Base(parent)] {
+		base = filepath.Dir(parent)
+	}
+	cfg.DataDir = resolve(raw.DataDir, base, filepath.Join(bin, "data"))
+	cfg.MediaDir = resolve(raw.MediaDir, base, filepath.Join(cfg.DataDir, "media"))
+	cfg.MediaKeep = 30
+	if raw.MediaKeep != nil {
+		cfg.MediaKeep = *raw.MediaKeep
+	}
 
 	// The speech engine and model (about 700 MB) are shared by add-ons: in
 	// the add-on folder they go to .doplnky/prepis, otherwise to data/stt.
@@ -141,7 +157,10 @@ func parseWith(data []byte, path, bin string) (*Config, error) {
 	}
 
 	var errs []string
-	cfg.Transcription = Transcription{Enabled: true, Threads: 2, Batch: 2, Dir: resolve(sttDir, path, sttDefault)}
+	cfg.Transcription = Transcription{Enabled: true, Threads: 2, Batch: 2, Dir: resolve(sttDir, base, sttDefault)}
+	if cfg.MediaKeep < 0 || cfg.MediaKeep > 3650 {
+		errs = append(errs, "media_keep_days: čeká počet dní 0 až 3650 (0 = nikdy nemazat)")
+	}
 	if t := raw.Transcription; t != nil {
 		if t.Enabled != nil {
 			cfg.Transcription.Enabled = *t.Enabled
@@ -166,11 +185,10 @@ func parseWith(data []byte, path, bin string) (*Config, error) {
 	}
 	if raw.Send != nil {
 		for _, d := range raw.Send.Files {
-			if !filepath.IsAbs(d) {
-				errs = append(errs, fmt.Sprintf("send.files: %q musí být celá cesta ke složce", d))
+			if strings.TrimSpace(d) == "" {
 				continue
 			}
-			cfg.Send.FileDirs = append(cfg.Send.FileDirs, filepath.Clean(d))
+			cfg.Send.FileDirs = append(cfg.Send.FileDirs, resolve(d, base, ""))
 		}
 	}
 	errs = checkSendWithinRead(cfg.Read, cfg.Send, errs)
@@ -180,15 +198,15 @@ func parseWith(data []byte, path, bin string) (*Config, error) {
 	return cfg, nil
 }
 
-// resolve: empty = def, absolute as is, relative = next to the config file.
-func resolve(v, configPath, def string) string {
+// resolve: empty = def, absolute as is, relative = from base.
+func resolve(v, base, def string) string {
 	switch {
 	case v == "":
 		return def
 	case filepath.IsAbs(v):
 		return filepath.Clean(v)
 	default:
-		return filepath.Join(filepath.Dir(configPath), v)
+		return filepath.Join(base, filepath.FromSlash(v))
 	}
 }
 
