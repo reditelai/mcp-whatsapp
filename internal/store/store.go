@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS messages (
 	deleted      INTEGER NOT NULL DEFAULT 0,
 	raw_chat     TEXT NOT NULL DEFAULT '',
 	raw_sender   TEXT NOT NULL DEFAULT '',
+	rev          INTEGER NOT NULL DEFAULT 0,
 	UNIQUE (chat_jid, id)
 );
 CREATE INDEX IF NOT EXISTS messages_chat_ts ON messages (chat_jid, ts);
@@ -95,9 +96,27 @@ END;
 `
 
 func (s *Store) migrate() error {
-	_, err := s.db.Exec(schema)
+	if _, err := s.db.Exec(schema); err != nil {
+		return err
+	}
+	// rev came after the first test installs: add it and number existing rows.
+	var n int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name = 'rev'`).Scan(&n); err != nil {
+		return err
+	}
+	if n == 0 {
+		if _, err := s.db.Exec(`ALTER TABLE messages ADD COLUMN rev INTEGER NOT NULL DEFAULT 0; UPDATE messages SET rev = seq`); err != nil {
+			return err
+		}
+	}
+	_, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS messages_rev ON messages (rev)`)
 	return err
 }
+
+// nextRev is the change counter: every insert, edit and delete gets a new
+// rev, so wa_new_messages reports changes too, not only new messages. Only
+// the instance holding the lock writes, so MAX()+1 cannot race.
+const nextRev = `(SELECT COALESCE(MAX(rev), 0) + 1 FROM messages)`
 
 // Chat is a stored chat.
 type Chat struct {
@@ -111,7 +130,7 @@ type Chat struct {
 
 // Message is a stored message.
 type Message struct {
-	Seq         int64  `json:"-"`
+	Rev         int64  `json:"-"`
 	Chat        string `json:"chat"`
 	ID          string `json:"id"`
 	SenderJID   string `json:"sender,omitempty"`
@@ -165,8 +184,8 @@ func (s *Store) SaveMessage(ctx context.Context, m NewMessage) (inserted bool, e
 	}
 	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO messages
 		(chat_jid, id, sender_jid, sender_phone, sender_name, from_me, ts, kind, text, quoted_id,
-		 media_mime, media_name, media_size, media_ref, raw_chat, raw_sender)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		 media_mime, media_name, media_size, media_ref, raw_chat, raw_sender, rev)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,`+nextRev+`)`,
 		m.Chat, m.ID, m.SenderJID, m.SenderPhone, m.SenderName, b2i(m.FromMe), m.Time.Unix(),
 		m.Kind, m.Text, m.QuotedID, m.MediaMime, m.MediaName, m.MediaSize, m.MediaRef, m.RawChat, m.RawSender)
 	if err != nil {
@@ -193,19 +212,29 @@ func (s *Store) SetChatName(ctx context.Context, jid, name string) error {
 	return err
 }
 
-// EditMessage replaces the text of a stored message.
-func (s *Store) EditMessage(ctx context.Context, chat, id, text string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE messages SET text = ?, edited = 1 WHERE chat_jid = ? AND id = ?`, text, chat, id)
-	return err
+// EditMessage replaces the text of a stored message. found is false when
+// the message is not stored (the caller logs it: an edit must not vanish
+// silently).
+func (s *Store) EditMessage(ctx context.Context, chat, id, text string) (found bool, err error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE messages SET text = ?, edited = 1, rev = `+nextRev+` WHERE chat_jid = ? AND id = ?`, text, chat, id)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }
 
 // DeleteMessage marks a message as deleted for everyone and drops its text
 // and media reference: the sender took it back, so it is not kept. It
 // returns the path of the downloaded media file, which the caller removes.
-func (s *Store) DeleteMessage(ctx context.Context, chat, id string) (mediaPath string, err error) {
+func (s *Store) DeleteMessage(ctx context.Context, chat, id string) (mediaPath string, found bool, err error) {
 	_ = s.db.QueryRowContext(ctx, `SELECT media_path FROM messages WHERE chat_jid = ? AND id = ?`, chat, id).Scan(&mediaPath)
-	_, err = s.db.ExecContext(ctx, `UPDATE messages SET text = '', deleted = 1, media_ref = NULL, media_path = '' WHERE chat_jid = ? AND id = ?`, chat, id)
-	return mediaPath, err
+	res, err := s.db.ExecContext(ctx, `UPDATE messages SET text = '', deleted = 1, media_ref = NULL, media_path = '', rev = `+nextRev+` WHERE chat_jid = ? AND id = ?`, chat, id)
+	if err != nil {
+		return "", false, err
+	}
+	n, _ := res.RowsAffected()
+	return mediaPath, n > 0, nil
 }
 
 // SetMediaPath records where the downloaded media file is.
@@ -219,7 +248,7 @@ func (s *Store) SetMediaPath(ctx context.Context, chat, id, path string) (bool, 
 	return n > 0, nil
 }
 
-const msgCols = `seq, chat_jid, id, sender_jid, sender_phone, sender_name, from_me, ts, kind, text,
+const msgCols = `rev, chat_jid, id, sender_jid, sender_phone, sender_name, from_me, ts, kind, text,
 	quoted_id, media_mime, media_name, media_size, media_path, edited, deleted, media_ref, raw_chat, raw_sender`
 
 func scanMessages(rows *sql.Rows) ([]Message, error) {
@@ -229,7 +258,7 @@ func scanMessages(rows *sql.Rows) ([]Message, error) {
 		var m Message
 		var fromMe, edited, deleted int
 		var ts int64
-		if err := rows.Scan(&m.Seq, &m.Chat, &m.ID, &m.SenderJID, &m.SenderPhone, &m.SenderName, &fromMe,
+		if err := rows.Scan(&m.Rev, &m.Chat, &m.ID, &m.SenderJID, &m.SenderPhone, &m.SenderName, &fromMe,
 			&ts, &m.Kind, &m.Text, &m.QuotedID, &m.MediaMime, &m.MediaName, &m.MediaSize, &m.MediaPath,
 			&edited, &deleted, &m.mediaRef, &m.RawChat, &m.RawSender); err != nil {
 			return nil, err
@@ -277,7 +306,7 @@ func (s *Store) ChatMessages(ctx context.Context, chat string, before time.Time,
 		q += ` AND ts < ?`
 		args = append(args, before.Unix())
 	}
-	q += ` ORDER BY ts DESC, seq DESC LIMIT ?`
+	q += ` ORDER BY ts DESC, rev DESC LIMIT ?`
 	args = append(args, limit)
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -286,9 +315,10 @@ func (s *Store) ChatMessages(ctx context.Context, chat string, before time.Time,
 	return scanMessages(rows)
 }
 
-// After returns messages stored after cursor seq, oldest first.
+// After returns messages new or changed (edited, deleted) after cursor,
+// in order of the change.
 func (s *Store) After(ctx context.Context, cursor int64, limit int) ([]Message, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+msgCols+` FROM messages WHERE seq > ? ORDER BY seq LIMIT ?`, cursor, limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT `+msgCols+` FROM messages WHERE rev > ? ORDER BY rev LIMIT ?`, cursor, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -297,17 +327,17 @@ func (s *Store) After(ctx context.Context, cursor int64, limit int) ([]Message, 
 
 // Latest returns the newest limit messages, oldest first.
 func (s *Store) Latest(ctx context.Context, limit int) ([]Message, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT * FROM (SELECT `+msgCols+` FROM messages ORDER BY seq DESC LIMIT ?) ORDER BY seq`, limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT * FROM (SELECT `+msgCols+` FROM messages ORDER BY rev DESC LIMIT ?) ORDER BY rev`, limit)
 	if err != nil {
 		return nil, err
 	}
 	return scanMessages(rows)
 }
 
-// MaxSeq returns the current end of the message log.
-func (s *Store) MaxSeq(ctx context.Context) (int64, error) {
+// MaxRev returns the current end of the change log.
+func (s *Store) MaxRev(ctx context.Context) (int64, error) {
 	var n sql.NullInt64
-	err := s.db.QueryRowContext(ctx, `SELECT MAX(seq) FROM messages`).Scan(&n)
+	err := s.db.QueryRowContext(ctx, `SELECT MAX(rev) FROM messages`).Scan(&n)
 	return n.Int64, err
 }
 

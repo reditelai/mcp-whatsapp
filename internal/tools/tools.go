@@ -23,11 +23,11 @@ import (
 // Instructions are sent to the client on connect.
 const Instructions = `WhatsApp for a personal assistant. Tools are prefixed wa_.
 
-Start with wa_status. If state is not_paired or logged_out, pair with wa_pair: ask the user to open WhatsApp on the phone (Settings, Linked devices, Link a device) BEFORE calling it, because each QR code is valid for only 20-60 seconds. wa_pair saves the QR image to qr_path; open that file for the user right away. After scanning, wa_status turns connected.
+Start with wa_status. If state is not_paired or logged_out, pair with wa_pair: ask the user to open WhatsApp on the phone (Settings, Linked devices, Link a device) BEFORE calling it, because each QR code is valid for only 20-60 seconds. The image inside the tool result is usually hidden in a collapsed tool call, so show qr_path to the user right away outside of it: send it as a file if you have a tool for that (the reliable way in Remote Control), otherwise open it (Windows: start, macOS: open). After scanning, wa_status turns connected.
 
 The server only sees chats the config allows to read, and only sends where the config allows. A send_forbidden error is the user's setting: tell them, never work around it. Send only messages the user explicitly asked you to send in this conversation.
 
-New messages: call wa_new_messages with the cursor you got last time and keep the returned cursor (for example in the vault), like a mail anchor. Voice notes arrive as kind "voice" with a media file.
+New messages: call wa_new_messages with the cursor you got last time and keep the returned cursor (for example in the vault), like a mail anchor. It also returns messages that were edited (edited: true, new text) or deleted for everyone (deleted: true, no text) since the cursor; update what you noted from them. Messages with from_me: true were sent by the user (or by you) and are context, not new requests. Voice notes arrive as kind "voice" with a media file.
 
 State locked_by_other_instance means another Claude conversation holds the WhatsApp connection: reading works, sending and pairing do not. Full guide for assistants: https://github.com/reditelai/mcp-whatsapp/blob/main/docs/pro-asistenta.md`
 
@@ -68,7 +68,7 @@ func Register(s *server.MCPServer, m *wa.Manager) {
 		ro), h.getMessages)
 
 	s.AddTool(mcp.NewTool("wa_new_messages",
-		mcp.WithDescription("Messages stored after cursor across all readable chats, oldest first, and the next cursor. Keep the cursor and pass it next time. Without cursor returns the latest messages. has_more true means call again with the new cursor."),
+		mcp.WithDescription("Messages new or changed after cursor across all readable chats, in order, and the next cursor. Changed means edited (edited: true, current text) or deleted for everyone (deleted: true, no text); such a message comes again with the same id. from_me: true is the user's own message. Keep the cursor and pass it next time. Without cursor returns the latest messages. has_more true means call again with the new cursor."),
 		mcp.WithString("cursor", mcp.Description("Cursor from the previous call")),
 		mcp.WithNumber("limit", mcp.Description("Default 100, max 500")),
 		ro), h.newMessages)
@@ -229,7 +229,7 @@ func (h *handlers) pair(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 	text, _ := json.MarshalIndent(map[string]any{
 		"qr_path":    res.QRPath,
 		"expires_at": res.ExpiresAt.UTC().Format(time.RFC3339),
-		"next":       "Open qr_path for the user now. They scan it in WhatsApp, Linked devices, Link a device. If it expires, call wa_pair again. After scanning, wa_status turns connected.",
+		"next":       "Show qr_path to the user now outside this tool result: send it as a file if you can, otherwise open it. They scan it in WhatsApp, Linked devices, Link a device. If it expires, call wa_pair again. After scanning, wa_status turns connected.",
 	}, "", "  ")
 	return mcp.NewToolResultImage(string(text), base64.StdEncoding.EncodeToString(res.PNG), "image/png"), nil
 }
@@ -359,11 +359,11 @@ func (h *handlers) newMessages(ctx context.Context, req mcp.CallToolRequest) (*m
 	}
 	next := int64(0)
 	if len(msgs) > 0 {
-		next = msgs[len(msgs)-1].Seq
+		next = msgs[len(msgs)-1].Rev
 	} else if cursorArg != "" {
 		next, _ = strconv.ParseInt(cursorArg, 10, 64)
 	} else {
-		next, _ = st.MaxSeq(ctx)
+		next, _ = st.MaxRev(ctx)
 	}
 	msgs = h.filter(ctx, msgs)
 	return jsonResult(map[string]any{

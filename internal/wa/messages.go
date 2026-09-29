@@ -15,6 +15,7 @@ import (
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/reditelai/mcp-whatsapp/internal/policy"
 	appstore "github.com/reditelai/mcp-whatsapp/internal/store"
@@ -87,27 +88,31 @@ func (m *Manager) onMessage(evt *events.Message, history bool) {
 	chatKey := chat.jid.String()
 	msg := evt.Message
 
+	// Current WhatsApp sends edits encrypted with the original message's
+	// secret; whatsmeow keeps the secrets but does not decrypt by itself.
+	if enc := msg.GetSecretEncryptedMessage(); enc != nil {
+		m.onSecretEncrypted(ctx, cli, evt, chatKey, enc)
+		return
+	}
+
 	if pm := msg.GetProtocolMessage(); pm != nil {
 		target := pm.GetKey().GetID()
 		// Edits arrive here too: UnwrapRaw leaves the ProtocolMessage inside
 		// the edited-message wrapper.
 		switch pm.GetType() {
 		case waE2E.ProtocolMessage_REVOKE:
-			path, err := m.st.DeleteMessage(ctx, chatKey, target)
-			if err != nil {
+			path, found, err := m.st.DeleteMessage(ctx, chatKey, target)
+			switch {
+			case err != nil:
 				m.log.Warnf("delete %s: %v", target, err)
+			case !found:
+				m.log.Infof("delete %s in %s: message not stored", target, chatKey)
 			}
 			if path != "" {
 				_ = os.Remove(path)
 			}
 		case waE2E.ProtocolMessage_MESSAGE_EDIT:
-			// An edit without text (media without caption) must not wipe
-			// the stored text.
-			if t := editedText(pm.GetEditedMessage()); t != "" {
-				if err := m.st.EditMessage(ctx, chatKey, target, t); err != nil {
-					m.log.Warnf("edit %s: %v", target, err)
-				}
-			}
+			m.applyEdit(ctx, chatKey, target, pm.GetEditedMessage())
 		}
 		return
 	}
@@ -131,7 +136,12 @@ func (m *Manager) onMessage(evt *events.Message, history bool) {
 	}
 	fillContent(&nm, msg)
 	if nm.Kind == "" {
-		return // receipts, key distribution and other protocol noise
+		// Key distribution and other protocol noise lands here, but so would
+		// a new message type: name it in the log, never drop it silently.
+		if f := setFields(msg); f != "" && !onlyNoise(f) {
+			m.log.Infof("message %s in %s not stored: unsupported content (%s)", evt.Info.ID, chatKey, f)
+		}
+		return
 	}
 	inserted, err := m.st.SaveMessage(ctx, nm)
 	if err != nil {
@@ -225,6 +235,74 @@ func fillContent(nm *appstore.NewMessage, msg *waE2E.Message) {
 			nm.QuotedID = msg.GetExtendedTextMessage().GetContextInfo().GetStanzaID()
 		}
 	}
+}
+
+// applyEdit stores the new text of an edited message. An edit without text
+// (media without caption) must not wipe the stored text.
+func (m *Manager) applyEdit(ctx context.Context, chatKey, target string, edited *waE2E.Message) {
+	t := editedText(edited)
+	if t == "" {
+		m.log.Infof("edit %s in %s: no text in the new content (%s)", target, chatKey, setFields(edited))
+		return
+	}
+	found, err := m.st.EditMessage(ctx, chatKey, target, t)
+	switch {
+	case err != nil:
+		m.log.Warnf("edit %s: %v", target, err)
+	case !found:
+		m.log.Infof("edit %s in %s: message not stored", target, chatKey)
+	}
+}
+
+func (m *Manager) onSecretEncrypted(ctx context.Context, cli *whatsmeow.Client, evt *events.Message, chatKey string, enc *waE2E.SecretEncryptedMessage) {
+	if enc.GetSecretEncType() != waE2E.SecretEncryptedMessage_MESSAGE_EDIT {
+		m.log.Debugf("secret encrypted %s ignored", enc.GetSecretEncType())
+		return
+	}
+	target := enc.GetTargetMessageKey().GetID()
+	if cli == nil {
+		return
+	}
+	dec, err := cli.DecryptSecretEncryptedMessage(ctx, evt)
+	if err != nil {
+		m.log.Warnf("edit %s in %s: cannot decrypt: %v", target, chatKey, err)
+		return
+	}
+	// The plaintext is either the new content, or a protocol message
+	// carrying it.
+	if pm := dec.GetProtocolMessage(); pm != nil && pm.GetType() == waE2E.ProtocolMessage_MESSAGE_EDIT {
+		if id := pm.GetKey().GetID(); id != "" {
+			target = id
+		}
+		dec = pm.GetEditedMessage()
+	}
+	m.applyEdit(ctx, chatKey, target, dec)
+}
+
+// onlyNoise reports whether a field list holds only protocol bookkeeping.
+func onlyNoise(fields string) bool {
+	for _, f := range strings.Split(fields, ",") {
+		switch f {
+		case "messageContextInfo", "senderKeyDistributionMessage", "fastRatchetKeySenderKeyDistributionMessage":
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// setFields names the top-level fields set in a message, for logs. Never
+// the content itself.
+func setFields(msg *waE2E.Message) string {
+	if msg == nil {
+		return ""
+	}
+	var names []string
+	msg.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
+		names = append(names, string(fd.Name()))
+		return true
+	})
+	return strings.Join(names, ",")
 }
 
 // editedText is the new text of an edit: plain text or a media caption.

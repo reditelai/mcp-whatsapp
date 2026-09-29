@@ -137,10 +137,11 @@ func (m *Manager) Status() Status {
 	return st
 }
 
-// Start takes the lock and connects, or waits for the lock in the background.
+// Start decides about the lock right away (so the first wa_status already
+// tells), then connects in the background, or waits for the lock.
 func (m *Manager) Start(ctx context.Context) {
 	if m.tryLock() {
-		m.startSession(ctx)
+		go m.startSession(ctx)
 		return
 	}
 	m.setState(StateLocked, "Spojení s WhatsAppem drží jiná instance serveru (jiná konverzace). Čtení uložených zpráv funguje, odesílání a párování ne.")

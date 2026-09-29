@@ -50,8 +50,9 @@ func main() {
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	// Connecting can take a while; the MCP handshake must not wait for it.
-	go m.Start(ctx)
+	// Start only decides about the lock; connecting runs in the background,
+	// so the MCP handshake does not wait for it.
+	m.Start(ctx)
 	defer m.Close()
 
 	s := server.NewMCPServer("mcp-whatsapp", mcpwhatsapp.Version(),

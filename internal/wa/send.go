@@ -79,11 +79,16 @@ func (m *Manager) sendTarget(ctx context.Context, chat string) (types.JID, error
 	return c, nil
 }
 
-// SentMessage is the result of a send.
+// SentMessage is the result of a send. Time is UTC in RFC 3339, the same
+// form as stored messages.
 type SentMessage struct {
-	Chat string    `json:"chat"`
-	ID   string    `json:"id"`
-	Time time.Time `json:"time"`
+	Chat string `json:"chat"`
+	ID   string `json:"id"`
+	Time string `json:"time"`
+}
+
+func sent(target types.JID, resp whatsmeow.SendResponse) *SentMessage {
+	return &SentMessage{Chat: target.String(), ID: resp.ID, Time: resp.Timestamp.UTC().Format(time.RFC3339)}
 }
 
 // SendText sends a text message, optionally as a reply to a stored message.
@@ -112,7 +117,7 @@ func (m *Manager) SendText(ctx context.Context, chat, text, replyTo string) (*Se
 		return nil, err
 	}
 	m.saveSent(ctx, target, resp, "text", text, replyTo, "", "", 0)
-	return &SentMessage{Chat: target.String(), ID: resp.ID, Time: resp.Timestamp}, nil
+	return sent(target, resp), nil
 }
 
 func (m *Manager) replyContext(ctx context.Context, chat, id string) (*waE2E.ContextInfo, error) {
@@ -203,7 +208,7 @@ func (m *Manager) SendFile(ctx context.Context, chat, path, caption string) (*Se
 		return nil, err
 	}
 	m.saveSent(ctx, target, resp, kind, caption, "", mimeType, name, int64(size))
-	return &SentMessage{Chat: target.String(), ID: resp.ID, Time: resp.Timestamp}, nil
+	return sent(target, resp), nil
 }
 
 // allowedFile checks that path is inside one of send.files and not inside

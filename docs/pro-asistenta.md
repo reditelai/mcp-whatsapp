@@ -126,9 +126,9 @@ Pak požádej uživatele o novou konverzaci. V ní zavolej `wa_status`: čekáš
 1. Řekni uživateli, ať si připraví telefon: **WhatsApp → Nastavení →
    Propojená zařízení → Propojit zařízení.** Počkej, až řekne, že má kameru
    připravenou. Kód platí jen 20 až 60 sekund.
-2. Zavolej `wa_pair`. Hned otevři obrázek z `qr_path`:
-   - Windows: `start "" "CESTA"`
-   - macOS: `open "CESTA"`
+2. Zavolej `wa_pair`. Obrázek ve výsledku nástroje uživatel nevidí (je ve sbaleném volání), proto mu **hned ukaž soubor z `qr_path`**:
+   - když máš nástroj na poslání souboru uživateli, pošli ho (v Remote Control je to jediná spolehlivá cesta),
+   - jinak ho otevři: Windows `start "" "CESTA"`, macOS `open "CESTA"`.
 3. Uživatel naskenuje. Když kód mezitím vyprší, zavolej `wa_pair` znovu, vrátí
    čerstvý.
 4. Když obrázek nejde ukázat (server bez obrazovky, vzdálený přístup), použij
@@ -167,6 +167,11 @@ Pak požádej uživatele o novou konverzaci. V ní zavolej `wa_status`: čekáš
 2. Projdi zprávy, co se týká úkolů a lidí, zapiš do vaultu podle svých
    pravidel. Hlasovky (`kind: "voice"`) mají soubor v `media_path`; přepis
    zatím neumíš, řekni, že přišla hlasovka od koho a jak dlouhá.
+   - **Upravená zpráva** přijde znovu se stejným `id` a `edited: true`,
+     **smazaná pro všechny** s `deleted: true` a bez textu. Oprav podle toho,
+     co sis z ní zapsala.
+   - **`from_me: true`** je zpráva, kterou poslal uživatel (nebo ty). Je to
+     kontext rozhovoru, ne nové zadání.
 3. Nový `cursor` zapiš do kotvy. Když je `has_more`, opakuj.
 
 Kurzor se posouvá, i když zprávy jen projdeš. Co z nich vzešlo, zapiš dřív

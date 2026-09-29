@@ -120,7 +120,8 @@ zařízením se navzájem shazují. Proto:
 
 - **`wa_pair`** vrátí QR kód jako obrázek a zároveň ho uloží do
   `pair-qr.png` v datové složce. Obrázek z nástroje aplikace ukazuje jen
-  v rozbaleném volání, proto asistent soubor rovnou otevře.
+  v rozbaleném volání (ověřeno v Remote Control 29. 9.), proto ho asistent
+  uživateli pošle jako soubor, nebo ho otevře.
 - WhatsApp dává šest kódů za sebou, první platí 60 s, další 20 s. **Kódy
   převezme proces na pozadí**, takže každé volání vrátí hned ten platný.
   Když dojdou, další volání spustí nové párování.
@@ -136,9 +137,15 @@ zařízením se navzájem shazují. Proto:
   z telefonu (asistent pak vidí celý rozhovor).
 - **Média se stahují hned při příchodu** do `media/` v datové složce. Odkazy
   WhatsAppu po čase vyprší.
-- **`wa_new_messages`** vrátí zprávy od kurzoru a nový kurzor. Kurzor drží
-  klient (vzor kotvy z mcp-multi-gmail): víc konverzací tak nemá společný stav,
-  který by se rozešel.
+- **`wa_new_messages`** vrátí zprávy nové nebo změněné od kurzoru a nový
+  kurzor. Změna je úprava nebo smazání pro všechny: zpráva přijde znovu se
+  stejným `id`. Kurzor je čítač změn (`rev`), drží ho klient (vzor kotvy
+  z mcp-multi-gmail): víc konverzací tak nemá společný stav, který by se
+  rozešel.
+- **Úpravy chodí zašifrované** klíčem původní zprávy (`SecretEncryptedMessage`).
+  Server je rozšifruje přes whatsmeow; úprava, kterou nejde přiřadit, se
+  zapíše do logu, nikdy nezmizí potichu. Totéž zpráva nepodporovaného typu.
+- **Časy** ve všech výstupech jsou UTC v RFC 3339.
 - Když je aplikace zavřená, zprávy čekají v telefonu a po připojení dorazí.
 
 ## Nástroje (0.1)
