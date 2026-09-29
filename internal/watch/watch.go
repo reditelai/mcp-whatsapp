@@ -15,6 +15,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -125,7 +126,9 @@ func Run(ctx context.Context, cfg *config.Config, cursor int64, o Options, out i
 		if b, err := os.ReadFile(claim); err == nil && string(b) != token {
 			return say(ExitReplaced, "konec: hlídání převzal novější hlídač")
 		}
-		if ppid != 1 && os.Getppid() != ppid {
+		// Windows keeps the dead parent's PID and a failed lookup returns -1,
+		// so the check would only ever misfire there.
+		if runtime.GOOS != "windows" && ppid != 1 && os.Getppid() != ppid {
 			return say(ExitReplaced, "konec: proces, který hlídače spustil, skončil")
 		}
 

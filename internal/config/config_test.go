@@ -99,3 +99,26 @@ func TestWake(t *testing.T) {
 		t.Fatal("all")
 	}
 }
+
+func TestHistorySync(t *testing.T) {
+	c, err := Parse([]byte(`{"read":{"chats":"all"},"history_sync":true,"history_days":1}`), "x")
+	if err != nil || !c.HistorySync || c.HistoryDays != 1 {
+		t.Fatalf("%v %+v", err, c)
+	}
+	if _, err := Parse([]byte(`{"history_days":1}`), "x"); err == nil {
+		t.Fatal("history_days without history_sync accepted")
+	}
+}
+
+func TestConfigDetails(t *testing.T) {
+	c, err := Parse([]byte("\xef\xbb\xbf"+`{"read":{"chats":"all"},"owner":"+420724000111"}`), "x")
+	if err != nil || len(c.Owners) != 1 {
+		t.Fatalf("BOM or single owner: %v %+v", err, c)
+	}
+	if _, err := Parse([]byte(`{"read":{"chats":["777 123 456"]}}`), "x"); err == nil {
+		t.Fatal("number without country code accepted")
+	}
+	if _, err := Parse([]byte(`{"read":{"chats":["420777123456", "+354 1234567"]}}`), "x"); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -102,6 +102,9 @@ func (m *Manager) onMessage(evt *events.Message, history bool) {
 		// the edited-message wrapper.
 		switch pm.GetType() {
 		case waE2E.ProtocolMessage_REVOKE:
+			if !m.mayChange(ctx, cli, evt.Info, chatKey, target, true) {
+				return
+			}
 			path, found, err := m.st.DeleteMessage(ctx, chatKey, target)
 			switch {
 			case err != nil:
@@ -113,7 +116,9 @@ func (m *Manager) onMessage(evt *events.Message, history bool) {
 				_ = os.Remove(path)
 			}
 		case waE2E.ProtocolMessage_MESSAGE_EDIT:
-			m.applyEdit(ctx, chatKey, target, pm.GetEditedMessage())
+			if m.mayChange(ctx, cli, evt.Info, chatKey, target, false) {
+				m.applyEdit(ctx, chatKey, target, pm.GetEditedMessage())
+			}
 		}
 		return
 	}
@@ -294,7 +299,72 @@ func (m *Manager) onSecretEncrypted(ctx context.Context, cli *whatsmeow.Client, 
 		}
 		dec = pm.GetEditedMessage()
 	}
-	m.applyEdit(ctx, chatKey, target, dec)
+	if m.mayChange(ctx, cli, evt.Info, chatKey, target, false) {
+		m.applyEdit(ctx, chatKey, target, dec)
+	}
+}
+
+// mayChange: an edit must come from whoever sent the message, a delete for
+// everyone from them or a group admin. WhatsApp itself does not stop anyone
+// in a group from sending an edit for someone else's message, and a forged
+// edit of the owner's message would read as the owner's instruction.
+// A message that is not stored passes (the change then finds nothing).
+func (m *Manager) mayChange(ctx context.Context, cli *whatsmeow.Client, info types.MessageInfo, chatKey, target string, revoke bool) bool {
+	stored, err := m.st.GetMessage(ctx, chatKey, target)
+	if err != nil {
+		return true
+	}
+	if stored.FromMe || info.IsFromMe {
+		if stored.FromMe == info.IsFromMe {
+			return true
+		}
+	} else if m.sameSender(ctx, cli, info, stored) {
+		return true
+	}
+	if revoke && info.Chat.Server == types.GroupServer && m.isGroupAdmin(ctx, cli, info.Chat, info) {
+		return true
+	}
+	kind := "edit"
+	if revoke {
+		kind = "delete"
+	}
+	m.log.Warnf("%s of %s in %s ignored: not sent by the author of the message", kind, target, chatKey)
+	return false
+}
+
+func (m *Manager) sameSender(ctx context.Context, cli *whatsmeow.Client, info types.MessageInfo, stored *appstore.Message) bool {
+	who := m.resolvePerson(ctx, cli, info.Sender, info.SenderAlt)
+	if who.phone != "" && stored.SenderPhone != "" {
+		return "+"+who.phone == stored.SenderPhone
+	}
+	if who.jid.String() == stored.SenderJID {
+		return true
+	}
+	raw, err := types.ParseJID(stored.RawSender)
+	return err == nil && !raw.IsEmpty() && raw.ToNonAD() == info.Sender.ToNonAD()
+}
+
+func (m *Manager) isGroupAdmin(ctx context.Context, cli *whatsmeow.Client, group types.JID, info types.MessageInfo) bool {
+	if cli == nil {
+		return false
+	}
+	g, err := cli.GetGroupInfo(ctx, group)
+	if err != nil {
+		m.log.Warnf("group %s: cannot check admins: %v", group, err)
+		return false
+	}
+	who := m.resolvePerson(ctx, cli, info.Sender, info.SenderAlt)
+	sender := info.Sender.ToNonAD()
+	for _, p := range g.Participants {
+		if !p.IsAdmin && !p.IsSuperAdmin {
+			continue
+		}
+		if (who.phone != "" && (p.JID.User == who.phone || p.PhoneNumber.User == who.phone)) ||
+			p.JID.ToNonAD() == sender || p.LID.ToNonAD() == sender {
+			return true
+		}
+	}
+	return false
 }
 
 // onlyNoise reports whether a field list holds only protocol bookkeeping.
@@ -360,6 +430,10 @@ func (m *Manager) onHistorySync(evt *events.HistorySync) {
 	if cli == nil || evt.Data == nil {
 		return
 	}
+	var since time.Time
+	if d := m.cfg.HistoryDays; d > 0 {
+		since = time.Now().AddDate(0, 0, -d)
+	}
 	for _, conv := range evt.Data.GetConversations() {
 		chatJID, err := types.ParseJID(conv.GetID())
 		if err != nil {
@@ -367,7 +441,7 @@ func (m *Manager) onHistorySync(evt *events.HistorySync) {
 		}
 		for _, hm := range conv.GetMessages() {
 			parsed, err := cli.ParseWebMessage(chatJID, hm.GetMessage())
-			if err != nil {
+			if err != nil || (!since.IsZero() && parsed.Info.Timestamp.Before(since)) {
 				continue
 			}
 			m.onMessage(parsed, true)

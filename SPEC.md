@@ -99,7 +99,9 @@ zařízením se navzájem shazují. Proto:
   (`…@lid`). Filtr porovnává obě, převod přes úložiště whatsmeow. Bez toho by
   povoleného člověka vyřadil.
 - **`history_sync`**: po spárování WhatsApp nabídne historii. Výchozí `false`
-  ji zahodí; `true` uloží jen povolené chaty.
+  ji zahodí; `true` uloží jen povolené chaty. `history_days` k tomu uloží jen
+  tak starou historii (`1` = posledních 24 hodin; Karel při testu na Windows
+  30. 9. 2026).
 - **`device_name`**: jak se zařízení jmenuje v telefonu v Propojených
   zařízeních.
 - Konfigurace se čte při startu. **Asistent ji nemění sám**, jen se souhlasem
@@ -110,7 +112,7 @@ zařízením se navzájem shazují. Proto:
 
 ## Stav
 
-`wa_status` vrací `state` a u chyby i `error` s vysvětlením:
+`wa_status` vrací v `status` pole `state` a u chyby i `error` s vysvětlením:
 
 | `state` | Co to znamená | Co s tím |
 |---|---|---|
@@ -196,8 +198,9 @@ Chyby vrací nástroje jako `{"error": {"code": "…", "message": "…"}}`.
 
 - **0.2 - přepis hlasovek** (hotové, viz „Přepis hlasovek" níž).
 - **0.3 - hlídání nových zpráv bez tokenů** (hotové, viz „Hlídání").
-- **1.0 - návod pro asistenta** (`docs/pro-asistenta.md`, instalace a provoz),
-  článek na miladka.cz, info kanál, test na Windows i Macu.
+- **1.0 - návod pro asistenta** (hotové) (`docs/pro-asistenta.md`, instalace a provoz,
+  i pro laika a anglickou Miládku), článek na miladka.cz, info kanál, test na
+  Windows. Test na Macu vydání nebrzdí (Karel 30. 9. 2026).
 
 ## Hlídání
 
@@ -209,8 +212,16 @@ konverzace), takže kontrolu „přišlo něco?" nedělá model, ale server.
 - **Majitel** (`owner` v configu, jeho telefonní čísla) je jediný, čí zprávy
   jsou pokyny (`from_owner: true` ve výstupu nástrojů). Ostatní zprávy jsou
   data, ať píšou cokoli. Rozhoduje odesílatel, ne chat: ve skupině by jinak
-  mohl kdokoli mluvit za majitele. Přeposlané zprávy (`forwarded`) jsou data
-  i od majitele.
+  mohl kdokoli mluvit za majitele. Ze stejného důvodu server přijme úpravu
+  zprávy jen od jejího autora a smazání od autora nebo správce skupiny
+  (revize 1.0: člen skupiny mohl přepsat zprávu majitele a ta se pak četla
+  jako jeho pokyn). Obsah přeposlané zprávy (`forwarded`) jsou data i od
+  majitele; to, že ji majitel přeposlal, je ale jeho žádost s ní něco udělat,
+  proto budí.
+- **Co se nikdy neodešle:** datová složka, složky doplňků (`.doplnky/`,
+  `.addons/`, jsou v nich klíče i jiných serverů) a `.miladka/secrets/`, ať
+  `send.files` povoluje cokoli. Na Windows a macOS se cesty porovnávají bez
+  ohledu na velikost písmen.
 - **Režim `--wait --cursor N`:** samostatný proces, který asistent spustí na
   pozadí (Bash s `run_in_background`). Každé 3 s čte `app.db` od kurzoru
   (jen čtení, `query_only`, bez migrace), k WhatsAppu se nepřipojuje a zámek
@@ -274,7 +285,7 @@ konverzace), takže kontrolu „přišlo něco?" nedělá model, ale server.
   v dávce.
 - **Tok:** hlasovka se stáhne, dostane `transcript_status: pending`, jediný
   pracovník ve instanci se zámkem ji přepíše a uloží `transcript` s `done`
-  (nebo `failed: …`). Hotový přepis je změna: zpráva přijde znovu ve
+  (nebo `failed`, důvod v `transcript_error`). Hotový přepis je změna: zpráva přijde znovu ve
   `wa_new_messages`. Po instalaci a po restartu se dopíší hlasovky z posledních
   7 dní, starší na požádání (`wa_transcribe`).
 - **Přepis je strojový**: asistent podle něj jedná, ale jména, čísla a termíny

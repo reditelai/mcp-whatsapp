@@ -5,6 +5,29 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.0.0] - 2026-09-30
+
+Stabilní verze: Miládka provede WhatsAppem i netechnického uživatele a od teď se nástroje a klíče nastavení mění jen s novou hlavní verzí.
+
+- Návod pro asistenta vede laika jako u Gmailu: jedna otázka na krok, výchozí nastavení navržené najednou, přehled, co dělá uživatel a co asistent.
+- Dva způsoby použití: asistent má vlastní číslo (píšeš mu z telefonu), nebo je na tvém čísle (čte tvoje chaty a posílá jen to, co schválíš).
+- Anglická Miládka: návod počítá s jejími složkami (`.addons/`, `inbox/`), README je i anglicky (`README.en.md`).
+- Nová volba `history_days`: s `history_sync` uloží po spárování jen posledních N dní historie (`1` = 24 hodin).
+- Opravy z revize před 1.0:
+  - Úpravu zprávy server přijme jen od jejího autora, smazání od autora nebo správce skupiny. Člen skupiny mohl přepsat zprávu majitele a ta se pak četla jako jeho pokyn.
+  - Úklid médií se nezasekne na souboru, který nejde smazat (otevřený v prohlížeči, drží ho antivir nebo OneDrive). Dřív se točil dokola a vytěžoval procesor.
+  - Datová složka, složky doplňků a `.miladka/secrets/` nejdou odeslat, ať `send.files` povoluje cokoli. Na Windows a macOS bez ohledu na velikost písmen.
+  - Hlídač na Windows nekončí omylem kódem 3, po uspání notebooku nehlásí falešně, že server neběží, a chybu v nastavení hlásí kódem 6.
+  - Databáze funguje i ve složce s `#` nebo `?` ve jménu.
+  - Číslo bez předvolby země server odmítne místo tichého nefungování. `owner` bere i jedno číslo místo seznamu. Nastavení uložené s BOM (Poznámkový blok, PowerShell) se načte.
+  - `--check` varuje, když data leží ve složce OneDrive, iCloudu, Dropboxu nebo Disku Google, a u asistenta na tvém čísle nehlásí, že hlídač nic neohlásí.
+- Změny výstupu: `transcript_status` je u chyby jen `failed`, důvod je v novém `transcript_error`; `lock_holder_pid` ve `wa_status` je číslo.
+
+### Při aktualizaci
+
+- Nastavení se nemění. Jestli v configu máš číslo bez předvolby země (třeba `777123456`), server se nespustí: se souhlasem uživatele ho oprav na `+420777123456` a ověř `--check`.
+- Po výměně binárky spusť znovu hlídače (B7), ať běží z nové verze.
+
 ## [0.3.0] - 2026-09-30
 
 Z telefonu rovnou k asistentovi: server sám hlídá nové zprávy a asistenta probudí, až mu napíšeš. Pokyny bere jen od tebe.

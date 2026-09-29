@@ -27,7 +27,11 @@ func (m *Manager) publishState(ctx context.Context) {
 	var lastWrite time.Time
 	for {
 		cur := m.serverState("")
-		if cur.State != last.State || cur.Error != last.Error || time.Since(lastWrite) >= stateHeartbeat {
+		// Wall clock, not the monotonic one: after a laptop sleeps, the
+		// watcher compares against wall time and must see a fresh heartbeat
+		// right away.
+		sinceWrite := time.Now().Round(0).Sub(lastWrite.Round(0))
+		if cur.State != last.State || cur.Error != last.Error || sinceWrite >= stateHeartbeat {
 			if err := m.st.SetServerState(ctx, cur); err != nil {
 				if ctx.Err() == nil {
 					m.log.Warnf("publishing state: %v", err)

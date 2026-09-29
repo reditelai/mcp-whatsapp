@@ -51,7 +51,7 @@ type Status struct {
 	Since       string `json:"since"`
 	Phone       string `json:"phone,omitempty"`
 	LastEventAt string `json:"last_event_at,omitempty"`
-	LockHolder  string `json:"lock_holder_pid,omitempty"`
+	LockHolder  int    `json:"lock_holder_pid,omitempty"`
 	DataDir     string `json:"data_dir"`
 }
 
@@ -137,7 +137,7 @@ func (m *Manager) Status() Status {
 	}
 	if m.state == StateLocked {
 		if h, ok := m.readHolder(); ok {
-			st.LockHolder = strconv.Itoa(h.PID)
+			st.LockHolder = h.PID
 		}
 	}
 	return st

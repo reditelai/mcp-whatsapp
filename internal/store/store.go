@@ -26,7 +26,13 @@ func DSN(path string) string {
 	v.Add("_pragma", "journal_mode(WAL)")
 	v.Add("_pragma", "busy_timeout(5000)")
 	v.Add("_pragma", "foreign_keys(1)")
-	return "file:" + path + "?" + v.Encode()
+	return "file:" + uriPath(path) + "?" + v.Encode()
+}
+
+// uriPath escapes what SQLite reads specially in a file: URI, so that a
+// folder named "Miládka #2" or "co?" keeps its database where it belongs.
+func uriPath(p string) string {
+	return strings.NewReplacer("%", "%25", "?", "%3f", "#", "%23").Replace(p)
 }
 
 // Store is app.db.
@@ -107,7 +113,7 @@ func OpenReader(path string) (*Store, error) {
 	v := url.Values{}
 	v.Add("_pragma", "busy_timeout(5000)")
 	v.Add("_pragma", "query_only(1)")
-	db, err := sql.Open("sqlite", "file:"+path+"?"+v.Encode())
+	db, err := sql.Open("sqlite", "file:"+uriPath(path)+"?"+v.Encode())
 	if err != nil {
 		return nil, err
 	}
@@ -279,9 +285,11 @@ type Message struct {
 	Edited      bool   `json:"edited,omitempty"`
 	Deleted     bool   `json:"deleted,omitempty"`
 	// Voice notes: machine transcript and its state ("pending", "done",
-	// "failed: …", "" when transcription is not installed).
+	// "failed" with the reason in TranscriptError, "" when transcription is
+	// not installed). Stored as "failed: reason" in one column.
 	Transcript       string `json:"transcript,omitempty"`
 	TranscriptStatus string `json:"transcript_status,omitempty"`
+	TranscriptError  string `json:"transcript_error,omitempty"`
 	// Forwarded: the sender passed on someone else's message - its content
 	// is not the sender's own words.
 	Forwarded bool `json:"forwarded,omitempty"`
@@ -435,6 +443,10 @@ func scanMessages(rows *sql.Rows) ([]Message, error) {
 			return nil, err
 		}
 		m.FromMe, m.Edited, m.Deleted, m.Forwarded = fromMe == 1, edited == 1, deleted == 1, forwarded == 1
+		if strings.HasPrefix(m.TranscriptStatus, "failed") {
+			m.TranscriptError = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(m.TranscriptStatus, "failed"), ":"))
+			m.TranscriptStatus = "failed"
+		}
 		m.SenderPhone = plus(m.SenderPhone)
 		m.ts = time.Unix(ts, 0)
 		m.Time = m.ts.UTC().Format(time.RFC3339)

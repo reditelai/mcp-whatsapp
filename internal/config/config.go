@@ -34,6 +34,9 @@ type Config struct {
 	Read        Scope
 	Send        Scope
 	HistorySync bool
+	// HistoryDays limits the history sync to the last N days; 0 = all
+	// the phone offers.
+	HistoryDays int
 	DeviceName  string
 
 	// Owners are the phone numbers whose messages are the user's own
@@ -85,8 +88,9 @@ type rawConfig struct {
 	Read        *rawScope       `json:"read"`
 	Send        *rawScope       `json:"send"`
 	HistorySync bool            `json:"history_sync"`
+	HistoryDays int             `json:"history_days"`
 	DeviceName  string          `json:"device_name"`
-	Owner       []string        `json:"owner"`
+	Owner       json.RawMessage `json:"owner"`
 	Wake        json.RawMessage `json:"wake"`
 
 	Transcription *struct {
@@ -126,6 +130,8 @@ func Parse(data []byte, path string) (*Config, error) {
 
 // parseWith is Parse with the binary's folder given (for tests).
 func parseWith(data []byte, path, bin string) (*Config, error) {
+	// Notepad and PowerShell 5 save UTF-8 with a byte order mark.
+	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	var raw rawConfig
@@ -133,7 +139,7 @@ func parseWith(data []byte, path, bin string) (*Config, error) {
 		return nil, fmt.Errorf("%s není platná konfigurace: %v", path, err)
 	}
 
-	cfg := &Config{Path: path, HistorySync: raw.HistorySync}
+	cfg := &Config{Path: path, HistorySync: raw.HistorySync, HistoryDays: raw.HistoryDays}
 
 	cfg.DeviceName = strings.TrimSpace(raw.DeviceName)
 	if cfg.DeviceName == "" {
@@ -204,7 +210,11 @@ func parseWith(data []byte, path, bin string) (*Config, error) {
 		}
 	}
 	errs = checkSendWithinRead(cfg.Read, cfg.Send, errs)
-	for _, o := range raw.Owner {
+	owners, err := stringList(raw.Owner)
+	if err != nil {
+		errs = append(errs, "owner: čeká číslo (+420…) nebo seznam čísel")
+	}
+	for _, o := range owners {
 		n, err := normalizePhone(o)
 		if err != nil {
 			errs = append(errs, "owner: "+err.Error())
@@ -216,10 +226,30 @@ func parseWith(data []byte, path, bin string) (*Config, error) {
 		cfg.Owners = append(cfg.Owners, n)
 	}
 	errs = parseWake(cfg, raw.Wake, errs)
+	if cfg.HistoryDays < 0 || cfg.HistoryDays > 3650 {
+		errs = append(errs, "history_days: čeká počet dní 1 až 3650 (1 = posledních 24 hodin), 0 = všechno")
+	} else if cfg.HistoryDays > 0 && !cfg.HistorySync {
+		errs = append(errs, "history_days platí jen s history_sync: true")
+	}
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("%s není platná konfigurace:\n  %s", path, strings.Join(errs, "\n  "))
 	}
 	return cfg, nil
+}
+
+// stringList accepts one string or a list of strings.
+func stringList(raw json.RawMessage) ([]string, error) {
+	t := bytes.TrimSpace(raw)
+	if len(t) == 0 || string(t) == "null" {
+		return nil, nil
+	}
+	var one string
+	if json.Unmarshal(t, &one) == nil {
+		return []string{one}, nil
+	}
+	var list []string
+	err := json.Unmarshal(t, &list)
+	return list, err
 }
 
 // parseWake: "owner" (default), "all", or a list of phone numbers and group
@@ -366,8 +396,13 @@ func normalizePhone(s string) (string, error) {
 	if !phoneRe.MatchString(t) {
 		return "", fmt.Errorf("%q není telefonní číslo v mezinárodním tvaru (třeba +420777123456)", s)
 	}
-	t = strings.ReplaceAll(strings.TrimPrefix(t, "+"), " ", "")
-	return t, nil
+	digits := strings.ReplaceAll(strings.TrimPrefix(t, "+"), " ", "")
+	// Without "+" a short number is a national one ("777 123 456"): it would
+	// never match a WhatsApp address, and nothing would say so.
+	if !strings.HasPrefix(t, "+") && len(digits) < 11 {
+		return "", fmt.Errorf("%q nemá předvolbu země (třeba +420777123456)", s)
+	}
+	return digits, nil
 }
 
 func normalizeGroup(s string) (string, error) {

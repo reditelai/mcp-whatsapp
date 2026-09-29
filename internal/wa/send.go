@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -224,8 +225,8 @@ func (m *Manager) allowedFile(path string) (string, error) {
 	if real, err := filepath.EvalSymlinks(abs); err == nil {
 		abs = real
 	}
-	if within(abs, m.cfg.DataDir) {
-		return "", fmt.Errorf("%w: files from the server data folder cannot be sent", ErrSendForbidden)
+	if within(abs, m.cfg.DataDir) || secretPath(abs) {
+		return "", fmt.Errorf("%w: files from the server data folder, add-on folders or secrets cannot be sent", ErrSendForbidden)
 	}
 	for _, d := range m.cfg.Send.FileDirs {
 		if within(abs, d) {
@@ -235,7 +236,29 @@ func (m *Manager) allowedFile(path string) (string, error) {
 	return "", fmt.Errorf("%w: %s is outside the folders in send.files", ErrSendForbidden, abs)
 }
 
+// secretPath: add-on folders (keys of this and other servers) and
+// .miladka/secrets are never sent, whatever send.files allows.
+func secretPath(path string) bool {
+	parts := strings.Split(filepath.ToSlash(foldCase(path)), "/")
+	for i, p := range parts {
+		if p == ".doplnky" || p == ".addons" || (p == ".miladka" && i+1 < len(parts) && parts[i+1] == "secrets") {
+			return true
+		}
+	}
+	return false
+}
+
+// foldCase: Windows and macOS file systems ignore case, so path checks must
+// too (.doplnky/MCP-whatsapp/data is the same folder as .doplnky/mcp-whatsapp/data).
+func foldCase(p string) string {
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		return strings.ToLower(p)
+	}
+	return p
+}
+
 func within(path, dir string) bool {
+	path, dir = foldCase(path), foldCase(dir)
 	rel, err := filepath.Rel(dir, path)
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 }

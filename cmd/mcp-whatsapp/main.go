@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -34,22 +35,36 @@ func main() {
 		fmt.Println(mcpwhatsapp.Version())
 		return
 	}
+	// In the waiting mode the model reads stdout and the exit code: a bad
+	// start is code 6 there, not a crash-like 1 or 2 that means "start again".
+	fail := func(code int, msg string) {
+		if *wait {
+			fmt.Println("chyba: " + msg)
+			os.Exit(watch.ExitUsage)
+		}
+		fmt.Fprintln(os.Stderr, msg)
+		os.Exit(code)
+	}
 	if *cfgPath == "" {
-		fmt.Fprintln(os.Stderr, "Chybí --config: cesta ke config.json (vzor v config.example.json).")
-		os.Exit(2)
+		fail(2, "Chybí --config: cesta ke config.json (vzor v config.example.json).")
 	}
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fail(1, err.Error())
 	}
 	if *check {
 		owner := "chybí (žádná zpráva není pokyn a hlídač nic neohlásí)"
+		if cfg.Wake != "owner" {
+			owner = "chybí (žádná zpráva není pokyn; v pořádku, když je asistent na tvém čísle)"
+		}
 		if len(cfg.Owners) > 0 {
 			owner = "+" + strings.Join(cfg.Owners, ", +")
 		}
 		fmt.Fprintf(os.Stderr, "Konfigurace %s je v pořádku.\nData: %s\nPřepis hlasovek: %s\nMajitel (owner): %s\nHlídač budí: %s\n",
 			cfg.Path, cfg.DataDir, cfg.Transcription.Dir, owner, cfg.WakeSummary())
+		if w := syncedFolder(cfg.DataDir); w != "" {
+			fmt.Fprintf(os.Stderr, "POZOR: data leží ve složce, kterou synchronizuje %s. Klíče k WhatsAppu (session.db) by odešly do cloudu a databáze na synchronizované složce se může poškodit. Přesuň složku Miládky mimo ni.\n", w)
+		}
 		return
 	}
 	if *wait {
@@ -87,4 +102,20 @@ func main() {
 	if err := server.ServeStdio(s, server.WithErrorLogger(log.New(os.Stderr, "mcp: ", log.LstdFlags))); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
+}
+
+// syncedFolder names the cloud sync client whose folder holds dir, or "".
+func syncedFolder(dir string) string {
+	d := strings.ToLower(filepath.ToSlash(dir))
+	switch {
+	case strings.Contains(d, "/onedrive"):
+		return "OneDrive"
+	case strings.Contains(d, "/library/mobile documents/") || strings.Contains(d, "/icloud"):
+		return "iCloud"
+	case strings.Contains(d, "/dropbox/"):
+		return "Dropbox"
+	case strings.Contains(d, "/google drive/") || strings.Contains(d, "/googledrive/"):
+		return "Google Drive"
+	}
+	return ""
 }

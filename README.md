@@ -2,6 +2,8 @@
 
 MCP server, přes který asistent čte a posílá zprávy na WhatsAppu.
 
+*[English version: `README.en.md`](README.en.md)*
+
 **Server je stavěný pro [Miládku](https://miladka.cz)**, AI asistentku, která
 běží v Claude Code nad tvým vaultem. Funguje ale s jakýmkoli MCP klientem.
 Návod pro asistenta, jak s tebou server nastavit a jak s ním pracovat, je
@@ -15,6 +17,18 @@ WhatsApp Web, ale přes neoficiální knihovnu
 [whatsmeow](https://github.com/tulir/whatsmeow). **Podmínky WhatsAppu
 neoficiální klienty zakazují a WhatsApp za to může číslo zablokovat.**
 Doporučujeme proto pro asistenta samostatné číslo, ne tvoje hlavní.
+
+## Dva způsoby použití
+
+Server se propojí s tím WhatsApp účtem, kterým naskenuješ QR kód.
+
+- **Asistent má vlastní číslo** (doporučujeme): druhá SIM, eSIM nebo starý
+  telefon. Píšeš a diktuješ mu ze svého telefonu jako komukoli jinému a on
+  ti odpovídá. Riziko zablokování nese jeho číslo.
+- **Asistent na tvém čísle**, podobně jako u pošty: čte tvoje chaty,
+  připravuje odpovědi a za tebe posílá jen to, co mu schválíš. Každá zpráva
+  odejde pod tvým jménem a riziko nese tvoje hlavní číslo. Pokyny mu přes
+  WhatsApp psát nejde, tvoje zprávy jsou pro server odeslané tebou.
 
 ## Co umí
 
@@ -75,17 +89,19 @@ S Miládkou to všechno udělá asistent podle `docs/pro-asistenta.md`.
 | `send.chats`, `send.groups` | kam smí psát, stejný tvar; jen v rámci toho, co smí číst |
 | `send.files` | celé cesty ke složkám, ze kterých smí posílat soubory; prázdné = soubory ne |
 | `history_sync` | po spárování uložit historii povolených chatů (výchozí ne) |
+| `history_days` | s `history_sync`: jen posledních N dní historie (`1` = posledních 24 hodin); bez něj všechno, co telefon nabídne |
 | `device_name` | jméno zařízení v telefonu v Propojených zařízeních |
 | `transcription.enabled` | přepis hlasovek; výchozí `true`, platí až po instalaci (`wa_transcription_setup`) |
 | `transcription.threads`, `transcription.batch` | vlákna a počet úseků najednou; výchozí 2 a 2 (asi 1,3 GB paměti). Na slabém stroji `batch: 1` |
-| `owner` | tvoje čísla (`+420…`): jen jejich zprávy jsou pro asistenta pokyny; musí být v `read.chats` |
+| `owner` | tvoje číslo nebo seznam čísel (`+420…`): jen jejich zprávy jsou pro asistenta pokyny; musí být v `read.chats` |
 | `wake` | které nové zprávy asistenta probudí (režim `--wait`): `"owner"` (výchozí), seznam dalších čísel a skupin (budí spolu s tebou), nebo `"all"` |
 | `media_dir` | kam se ukládají fotky, hlasovky a dokumenty; výchozí `data/media`, s Miládkou `vstupy/whatsapp` |
 | `media_keep_days` | po kolika dnech se stažená média smažou (text a přepis zůstanou); výchozí 30, `0` = nikdy |
 | `data_dir` | kde leží data serveru; výchozí `data/` vedle binárky |
 | `transcription.dir` | engine a model přepisu; výchozí `.doplnky/prepis` (sdílený s dalšími doplňky Miládky), jinde `data/stt` |
 
-**Prázdný seznam i chybějící klíč znamená nikam**, ne kamkoli. Relativní
+Čísla vždycky s předvolbou země (`+420777123456`), číslo bez ní server
+odmítne. **Prázdný seznam i chybějící klíč znamená nikam**, ne kamkoli. Relativní
 cesty se v Miládce berou od kořene její složky, jinde od složky s `config.json`.
 
 V datové složce je `session.db` s klíči spárovaného zařízení. **Kdo má ten
