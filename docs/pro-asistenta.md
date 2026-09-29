@@ -271,11 +271,27 @@ server: do konverzace pošle jen zprávy od majitele (`owner`), s
 `<channel source="whatsapp" from_owner="true" …>text</channel>` a sama
 spustí tvoji odpověď.
 
-**B - aplikace Claude: hlídač.** V aplikaci channel zatím nejde. Založ
-v konverzaci opakovanou úlohu (`CronCreate`, stejně jako denní přehled):
+**B - aplikace Claude: hlídač.** V aplikaci channel zatím nejde. Nejdřív se
+uživatele zeptej, **jak často a kdy má hlídač kontrolovat**, a řekni mu, co
+to stojí: každá kontrola je krátká odpověď a stojí trochu tokenů, i když nic
+nepřišlo.
 
-- `cron`: `*/15 * * * *` (každých 15 minut; uživatel může chtít jinak -
-  každá kontrola stojí trochu tokenů, i když nic nepřišlo),
+| Nabídni | `cron` | Reakce | Kontrol za den |
+|---|---|---|---|
+| každých 15 minut (výchozí) | `*/15 * * * *` | do 15 minut | kolem 50 za pracovní den |
+| každých 30 minut | `*/30 * * * *` | do půl hodiny | kolem 25 |
+| každou hodinu | `0 * * * *` | do hodiny | kolem 12 |
+| každých 5 minut | `*/5 * * * *` | skoro hned | kolem 150, znatelně víc tokenů |
+
+K tomu nabídni **jen v pracovní době**, třeba 7 až 20 h: `*/15 7-20 * * *`
+(v noci kontrola nemá smysl, když nikdo nepíše). Co zvolí, zapiš do
+`.miladka/stav.md` k modulu WhatsApp, ať to víš i příště. Změnit to může
+kdykoli: „kontroluj WhatsApp každou hodinu" = smaž úlohu a založ ji znovu.
+
+Pak založ v konverzaci opakovanou úlohu (`CronCreate`, stejně jako denní
+přehled):
+
+- `cron`: podle volby uživatele,
 - `recurring`: `true`,
 - `prompt`: „Hlídání WhatsAppu: `wa_new_messages` s kurzorem ze
   `system/whatsapp-kotva.md`, reaguj podle návodu mcp-whatsapp B7. Když nic

@@ -221,7 +221,9 @@ Cíl: uživatel píše nebo diktuje asistentovi z telefonu a ten hned reaguje.
   hlasovka až s přepisem, jen zprávy mladší než hodinu. Vlastní zprávy,
   reakce a smazané ne.
 - **Aplikace Claude:** channel tam zatím není; hlídač je opakovaná úloha
-  v konverzaci (cron, výchozí každých 15 minut), která volá `wa_new_messages`.
+  v konverzaci (cron, výchozí každých 15 minut; Miládka nabídne jiný interval
+a omezení na pracovní dobu, každá kontrola stojí tokeny), která volá
+`wa_new_messages`.
   Popsané v návodu pro asistenta, B7.
 
 ## Přepis hlasovek
