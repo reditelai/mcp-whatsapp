@@ -27,3 +27,21 @@ func TestParse(t *testing.T) {
 		t.Fatal("empty config must allow nothing")
 	}
 }
+
+func TestDefaultDirs(t *testing.T) {
+	c, err := parseWith([]byte(`{}`), "/v/.miladka/secrets/whatsapp/config.json", "/v/.doplnky/mcp-whatsapp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.DataDir != "/v/.doplnky/mcp-whatsapp/data" || c.Transcription.Dir != "/v/.doplnky/prepis" {
+		t.Fatalf("add-on folder: %s %s", c.DataDir, c.Transcription.Dir)
+	}
+	c, _ = parseWith([]byte(`{}`), "/h/mcp-whatsapp/config.json", "/h/mcp-whatsapp")
+	if c.DataDir != "/h/mcp-whatsapp/data" || c.Transcription.Dir != "/h/mcp-whatsapp/data/stt" {
+		t.Fatalf("plain folder: %s %s", c.DataDir, c.Transcription.Dir)
+	}
+	c, _ = parseWith([]byte(`{"data_dir":"d","transcription":{"dir":"/x/prepis"}}`), "/h/c/config.json", "/h/bin")
+	if c.DataDir != "/h/c/d" || c.Transcription.Dir != "/x/prepis" {
+		t.Fatalf("explicit: %s %s", c.DataDir, c.Transcription.Dir)
+	}
+}

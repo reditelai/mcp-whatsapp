@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/reditelai/mcp-whatsapp/internal/stt"
@@ -15,7 +16,7 @@ import (
 )
 
 func main() {
-	e := stt.New(os.Args[1], true, 2, 2, wa.NewLogger(wa.LevelInfo))
+	e := stt.New(filepath.Join(os.Args[1], "stt"), true, 2, 2, wa.NewLogger(wa.LevelInfo))
 	if err := e.Install(nil); err != nil {
 		panic(err)
 	}

@@ -39,9 +39,25 @@ type Config struct {
 
 // Transcription of voice notes (SPEC.md, 0.2).
 type Transcription struct {
-	Enabled bool // default true; takes effect once wa_transcription_setup installed the engine
-	Threads int  // engine threads, default 2
-	Batch   int  // segments per engine run, default 2 (about 1.3 GB of memory)
+	Enabled bool   // default true; takes effect once wa_transcription_setup installed the engine
+	Threads int    // engine threads, default 2
+	Batch   int    // segments per engine run, default 2 (about 1.3 GB of memory)
+	Dir     string // engine and model; shared with other add-ons (see DefaultTranscriptionDir)
+}
+
+// addonsDirs are the names of Miládka's add-on folder (CS and EN package).
+var addonsDirs = map[string]bool{".doplnky": true, ".addons": true}
+
+// exeDir is the folder of the running binary.
+func exeDir() (string, error) {
+	p, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		p = r
+	}
+	return filepath.Dir(p), nil
 }
 
 type rawScope struct {
@@ -58,9 +74,10 @@ type rawConfig struct {
 	DeviceName  string    `json:"device_name"`
 
 	Transcription *struct {
-		Enabled *bool `json:"enabled"`
-		Threads int   `json:"threads"`
-		Batch   int   `json:"batch"`
+		Enabled *bool  `json:"enabled"`
+		Threads int    `json:"threads"`
+		Batch   int    `json:"batch"`
+		Dir     string `json:"dir"`
 	} `json:"transcription"`
 }
 
@@ -84,6 +101,15 @@ func Load(path string) (*Config, error) {
 
 // Parse validates config bytes. path is used for messages and relative paths.
 func Parse(data []byte, path string) (*Config, error) {
+	bin, err := exeDir()
+	if err != nil {
+		return nil, fmt.Errorf("Nejde zjistit složku serveru: %v", err)
+	}
+	return parseWith(data, path, bin)
+}
+
+// parseWith is Parse with the binary's folder given (for tests).
+func parseWith(data []byte, path, bin string) (*Config, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	var raw rawConfig
@@ -98,21 +124,24 @@ func Parse(data []byte, path string) (*Config, error) {
 		cfg.DeviceName = "Miládka"
 	}
 
-	switch {
-	case raw.DataDir == "":
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("Nejde zjistit domovskou složku pro data serveru, nastav \"data_dir\": %v", err)
-		}
-		cfg.DataDir = filepath.Join(home, ".mcp-whatsapp")
-	case filepath.IsAbs(raw.DataDir):
-		cfg.DataDir = filepath.Clean(raw.DataDir)
-	default:
-		cfg.DataDir = filepath.Join(filepath.Dir(path), raw.DataDir)
+	// Everything of the server lives next to its binary, so that in Miládka
+	// it all stays inside her folder (<vault>/.doplnky/mcp-whatsapp/) and
+	// moves with it (Karel, 29. 9. 2026: "vše mám v jedné složce").
+	cfg.DataDir = resolve(raw.DataDir, path, filepath.Join(bin, "data"))
+
+	// The speech engine and model (about 700 MB) are shared by add-ons: in
+	// the add-on folder they go to .doplnky/prepis, otherwise to data/stt.
+	sttDefault := filepath.Join(cfg.DataDir, "stt")
+	if parent := filepath.Dir(bin); addonsDirs[filepath.Base(parent)] {
+		sttDefault = filepath.Join(parent, "prepis")
+	}
+	sttDir := ""
+	if raw.Transcription != nil {
+		sttDir = raw.Transcription.Dir
 	}
 
 	var errs []string
-	cfg.Transcription = Transcription{Enabled: true, Threads: 2, Batch: 2}
+	cfg.Transcription = Transcription{Enabled: true, Threads: 2, Batch: 2, Dir: resolve(sttDir, path, sttDefault)}
 	if t := raw.Transcription; t != nil {
 		if t.Enabled != nil {
 			cfg.Transcription.Enabled = *t.Enabled
@@ -149,6 +178,18 @@ func Parse(data []byte, path string) (*Config, error) {
 		return nil, fmt.Errorf("%s není platná konfigurace:\n  %s", path, strings.Join(errs, "\n  "))
 	}
 	return cfg, nil
+}
+
+// resolve: empty = def, absolute as is, relative = next to the config file.
+func resolve(v, configPath, def string) string {
+	switch {
+	case v == "":
+		return def
+	case filepath.IsAbs(v):
+		return filepath.Clean(v)
+	default:
+		return filepath.Join(filepath.Dir(configPath), v)
+	}
 }
 
 func parseScope(name string, raw *rawScope, errs []string) (Scope, []string) {

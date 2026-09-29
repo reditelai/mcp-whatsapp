@@ -96,7 +96,7 @@ func NewManager(cfg *config.Config, log waLog.Logger) (*Manager, error) {
 		log:        log,
 		pol:        policy.New(cfg),
 		st:         st,
-		stt:        stt.New(cfg.DataDir, cfg.Transcription.Enabled, cfg.Transcription.Threads, cfg.Transcription.Batch, log.Sub("stt")),
+		stt:        stt.New(cfg.Transcription.Dir, cfg.Transcription.Enabled, cfg.Transcription.Threads, cfg.Transcription.Batch, log.Sub("stt")),
 		jobs:       make(chan transcriptJob, 256),
 		lock:       flock.New(filepath.Join(cfg.DataDir, "lock")),
 		state:      StateStarting,

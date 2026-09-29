@@ -95,7 +95,7 @@ type Status struct {
 
 // Engine runs transcriptions, one at a time.
 type Engine struct {
-	dir     string // <data>/stt
+	dir     string // shared add-on folder (.doplnky/prepis) or <data>/stt
 	threads int
 	batch   int
 	log     waLog.Logger
@@ -108,9 +108,9 @@ type Engine struct {
 	run sync.Mutex // one transcription at a time: memory is the limit
 }
 
-// New prepares the engine; it does not download anything.
-func New(dataDir string, enabled bool, threads, batch int, log waLog.Logger) *Engine {
-	e := &Engine{dir: filepath.Join(dataDir, "stt"), threads: threads, batch: batch, log: log}
+// New prepares the engine in dir; it does not download anything.
+func New(dir string, enabled bool, threads, batch int, log waLog.Logger) *Engine {
+	e := &Engine{dir: dir, threads: threads, batch: batch, log: log}
 	switch {
 	case !enabled:
 		e.state = StateOff

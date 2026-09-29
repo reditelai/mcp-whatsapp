@@ -10,7 +10,8 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 Hlasovky jako text: přepis přímo v počítači, a aktualizace, při které nová verze převezme spojení sama.
 
 - Přepis hlasovek lokálně (Parakeet v3 přes sherpa-onnx), nic neodchází ven. Instaluje se na souhlas uživatele nástrojem `wa_transcription_setup` (asi 510 MB, ověřené součty). Hlasovka přijde znovu s textem v `transcript`; starší na požádání `wa_transcribe`.
-- Nová volba `transcription` v `config.json` (`enabled`, `threads`, `batch`), výchozí hodnoty stačí.
+- Nová volba `transcription` v `config.json` (`enabled`, `threads`, `batch`, `dir`), výchozí hodnoty stačí.
+- Všechno ve složce Miládky: server a jeho data patří do `<vault>/.doplnky/mcp-whatsapp/`, data jsou výchozí vedle binárky (`data/`), přepis ve sdíleném `.doplnky/prepis/`. Registrace v `.mcp.json` s relativními cestami, přesun vaultu ji nerozbije.
 - Běžící server předá spojení instanci jiné verze a skončí; dvě konverzace se stejnou verzí se dál nepřetahují.
 - Návod: aktualizace výměnou souboru přejmenováním (na Windows běžící binárku nejde přepsat), návrat při selhání, založení `moduly-instalovane.json`, když chybí.
 
@@ -18,6 +19,11 @@ Hlasovky jako text: přepis přímo v počítači, a aktualizace, při které no
 
 - Nastavení se nemění, `transcription` se doplňovat nemusí. Postup je v `docs/pro-asistenta.md`, B5.
 - Po aktualizaci nabídni uživateli přepis hlasovek (návod A8).
+- **Přestěhování do složky Miládky** (z 0.1.x, kde byla binárka jinde a data v `~/.mcp-whatsapp`), se souhlasem uživatele:
+  1. Ověř, že `.doplnky/` je v `.gitignore` vaultu (návod A1). Bez toho nepokračuj.
+  2. Novou binárku stáhni a ověř rovnou do `VAULT/.doplnky/mcp-whatsapp/` (A2).
+  3. Zavři konverzace se serverem (nebo ukonči starý proces), přesuň `~/.mcp-whatsapp` do `VAULT/.doplnky/mcp-whatsapp/data` (klíče, zprávy, média; spárování zůstane) a přepiš registraci v `.mcp.json` na relativní cesty (A5). Starou registraci (`claude mcp remove whatsapp -s user`) a starou binárku odeber.
+  4. Nová konverzace, `wa_status`: `connected` bez párování.
 - **Z 0.1.0:** stará verze předání nezná. Když nová po minutě hlásí `locked_by_other_instance`, ukonči starý proces podle `lock_holder_pid` (B5, krok 4).
 
 ## [0.1.0] - 2026-09-29

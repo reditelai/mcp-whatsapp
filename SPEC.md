@@ -43,8 +43,15 @@ to říká na začátku a doporučuje samostatné číslo pro asistenta, ne hlav
 - `app.db` - zprávy, chaty a kontakty, jen z chatů, které konfigurace dovoluje
   číst.
 
-Datová složka je mimo vault, výchozí `~/.mcp-whatsapp/`. Konfigurace leží ve
-vaultu v `.miladka/secrets/whatsapp/config.json` (vzor mcp-multi-gmail).
+**Všechno je ve složce Miládky** (Karel, 29. 9. 2026: uživatel zná jen
+složku `miladka`, přesouvá a zálohuje ji celou). Binárka a data jsou ve
+skryté podsložce doplňků `<vault>/.doplnky/mcp-whatsapp/` (anglicky
+`.addons`), data výchozí v `data/` vedle binárky, přepis ve sdíleném
+`.doplnky/prepis/`. `.doplnky/` je v `.gitignore`: klíče ani programy do
+zálohy nejdou. Obsidian složky s tečkou nezobrazuje. Konfigurace leží
+v `.miladka/secrets/whatsapp/config.json` (vzor mcp-multi-gmail). Registrace
+v `.mcp.json` má cesty relativní ke kořeni vaultu, Claude Code server
+spouští z kořene projektu.
 
 ### Jedna instance drží spojení
 

@@ -38,7 +38,7 @@ func main() {
 		os.Exit(1)
 	}
 	if *check {
-		fmt.Fprintf(os.Stderr, "Konfigurace %s je v pořádku. Data: %s\n", cfg.Path, cfg.DataDir)
+		fmt.Fprintf(os.Stderr, "Konfigurace %s je v pořádku.\nData: %s\nPřepis hlasovek: %s\n", cfg.Path, cfg.DataDir, cfg.Transcription.Dir)
 		return
 	}
 

@@ -38,8 +38,10 @@ Binárky pro Windows, macOS a Linux (x64 i ARM) jsou v
 [releasech](https://github.com/reditelai/mcp-whatsapp/releases) spolu se
 `SHA256SUMS`. Nic dalšího se neinstaluje.
 
-1. Stáhni binárku pro svůj systém, ověř součet a ulož ji do
-   `~/mcp-whatsapp/` (na Windows `%USERPROFILE%\mcp-whatsapp\`).
+1. Stáhni binárku pro svůj systém, ověř součet a ulož ji do složky, kde má
+   server bydlet, třeba `~/mcp-whatsapp/`. **Data si dá vedle sebe** do
+   `data/`, takže se stěhuje jednou složkou. S Miládkou je to
+   `<složka Miládky>/.doplnky/mcp-whatsapp/`.
 2. Vytvoř `config.json` podle [`config.example.json`](config.example.json).
 3. Připoj server do Claude Code:
 
@@ -72,7 +74,8 @@ S Miládkou to všechno udělá asistent podle `docs/pro-asistenta.md`.
 | `device_name` | jméno zařízení v telefonu v Propojených zařízeních |
 | `transcription.enabled` | přepis hlasovek; výchozí `true`, platí až po instalaci (`wa_transcription_setup`) |
 | `transcription.threads`, `transcription.batch` | vlákna a počet úseků najednou; výchozí 2 a 2 (asi 1,3 GB paměti). Na slabém stroji `batch: 1` |
-| `data_dir` | kde leží data serveru, výchozí `~/.mcp-whatsapp` |
+| `data_dir` | kde leží data serveru; výchozí `data/` vedle binárky |
+| `transcription.dir` | engine a model přepisu; výchozí `.doplnky/prepis` (sdílený s dalšími doplňky Miládky), jinde `data/stt` |
 
 **Prázdný seznam i chybějící klíč znamená nikam**, ne kamkoli.
 

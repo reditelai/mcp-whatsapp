@@ -22,12 +22,36 @@ udělat bez něj, uděláš sama, a řekneš mu jen to, co musí on.
 
 ## Část A - nastavení
 
-### A1. Prostředí
+### A1. Prostředí a kam server patří
+
+**Všechno patří do složky Miládky.** Server, jeho data i přepis hlasovek jdou
+do skryté podsložky `.doplnky/` v kořeni vaultu (dál `VAULT`):
+
+```
+VAULT/.doplnky/mcp-whatsapp/     binárka, SHA256SUMS a data (klíče, zprávy, média)
+VAULT/.doplnky/prepis/           přepis hlasovek, sdílený s dalšími doplňky
+VAULT/.miladka/secrets/whatsapp/ config.json
+```
+
+Uživatel pak Miládku přestěhuje nebo zazálohuje jednou složkou. Obsidian
+složky s tečkou nezobrazuje.
+
+**Než cokoli stáhneš, ověř, že `.doplnky/` je v `.gitignore` vaultu.** Budou
+v ní klíče k WhatsAppu a ty do zálohy nesmí nikdy:
+
+```sh
+cd VAULT && mkdir -p .doplnky && git check-ignore -v .doplnky/x
+```
+
+Když příkaz nic nevypíše (nebo vault není v gitu, ale záloha se zapnout
+může), přidej do `VAULT/.gitignore` řádek `.doplnky/` a ověř znovu. Od verze
+balíčku, která `.doplnky` zavádí, tam řádek je.
+
+Zjisti systém:
 
 ```sh
 uname -s
 uname -m
-echo "$HOME"
 ```
 
 | `uname -s` | Soubor z releasu |
@@ -37,8 +61,6 @@ echo "$HOME"
 | `MINGW…`/`MSYS…` nebo chyba (PowerShell) | `mcp-whatsapp-windows-amd64.exe` (ARM: `-arm64.exe`) |
 | `Linux` + `x86_64` | `mcp-whatsapp-linux-amd64` |
 
-Na Windows v PowerShellu je domovská složka `$env:USERPROFILE`.
-
 ### A2. Stažení poslední verze
 
 ```sh
@@ -46,12 +68,10 @@ curl -s https://api.github.com/repos/reditelai/mcp-whatsapp/releases/latest
 ```
 
 Verze je v `tag_name` (dál `VERZE`). Stáhni binárku a `SHA256SUMS` do
-`$HOME/mcp-whatsapp/`. Když ta složka už existuje a je v ní něco jiného než
-binárka serveru (třeba zdrojový kód), použij `$HOME/mcp-whatsapp-bin/` a dál
-počítej s ní:
+`VAULT/.doplnky/mcp-whatsapp/`:
 
 ```sh
-mkdir -p "$HOME/mcp-whatsapp" && cd "$HOME/mcp-whatsapp"
+mkdir -p "VAULT/.doplnky/mcp-whatsapp" && cd "VAULT/.doplnky/mcp-whatsapp"
 curl -sLO https://github.com/reditelai/mcp-whatsapp/releases/download/VERZE/SOUBOR
 curl -sLO https://github.com/reditelai/mcp-whatsapp/releases/download/VERZE/SHA256SUMS
 grep " SOUBOR$" SHA256SUMS | sha256sum -c -
@@ -77,9 +97,8 @@ Zeptej se po jednom:
 
 ### A4. `config.json`
 
-S Miládkou patří do `.miladka/secrets/whatsapp/config.json` ve vaultu
-(`.miladka/secrets/` je v `.gitignore`, ověř `git check-ignore -v`). Jinde
-do `$HOME/mcp-whatsapp/config.json`.
+Patří do `VAULT/.miladka/secrets/whatsapp/config.json` (`.miladka/secrets/`
+je v `.gitignore`, ověř `git check-ignore -v`).
 
 ```json
 {
@@ -90,38 +109,41 @@ do `$HOME/mcp-whatsapp/config.json`.
 }
 ```
 
-Zkontroluj ho:
+`data_dir` ani `transcription.dir` nenastavuj: server si data dá vedle
+binárky (`.doplnky/mcp-whatsapp/data`) a přepis do `.doplnky/prepis`, takže
+se stěhují s vaultem. Zkontroluj ho (z kořene vaultu):
 
 ```sh
-"$HOME/mcp-whatsapp/SOUBOR" --config CESTA_KE_CONFIGU --check
+cd VAULT && .doplnky/mcp-whatsapp/SOUBOR --config .miladka/secrets/whatsapp/config.json --check
 ```
 
-Na Windows piš cesty s obyčejnými lomítky (`C:/Users/…`).
+Výpis říká i datovou složku; musí ležet v `.doplnky/mcp-whatsapp/data`.
 
 ### A5. Připojení do Claude Code
 
-Buď do `.mcp.json` v kořeni vaultu (Claude Code se na něj v nové konverzaci
-zeptá, uživatel povolí):
+Do `.mcp.json` v kořeni vaultu, **s cestami relativními ke kořeni vaultu**
+(Claude Code server spouští z kořene projektu, takže přesun vaultu
+registraci nerozbije):
 
 ```json
 {
   "mcpServers": {
     "whatsapp": {
-      "command": "CELÁ_CESTA_K_BINÁRCE",
-      "args": ["--config", "CELÁ_CESTA_KE_CONFIGU"]
+      "command": ".doplnky/mcp-whatsapp/SOUBOR",
+      "args": ["--config", ".miladka/secrets/whatsapp/config.json"]
     }
   }
 }
 ```
 
-Nebo pro uživatele napříč složkami:
+Když `.mcp.json` už existuje (třeba s `multi-gmail`), jen přidej záznam
+`whatsapp` do `mcpServers`. Pak požádej uživatele o novou konverzaci; Claude
+Code se zeptá, jestli server povolit, a uživatel povolí. V ní zavolej
+`wa_status`: čekáš `not_paired`.
 
-```sh
-claude mcp add whatsapp --scope user -- CELÁ_CESTA_K_BINÁRCE --config CELÁ_CESTA_KE_CONFIGU
-```
-
-Pak požádej uživatele o novou konverzaci. V ní zavolej `wa_status`: čekáš
-`not_paired`.
+Když server v nové konverzaci nenaběhne a jde o relativní cestu (některá
+verze aplikace ji nenajde), dej do `command` celou cestu k binárce. Po
+přesunu vaultu ji pak přepiš.
 
 ### A6. Spárování
 
@@ -229,17 +251,16 @@ a řekni mu, že platí od nové konverzace (server se načte znovu).
 
 ### B5. Aktualizace
 
-Novou verzi hlásí info kanál Miládky. Postup:
-
 Registrace v Claude Code se nemění, jen se vymění soubor, na který ukazuje.
-Běžící server předá spojení nové verzi sám. Postup:
+Běžící server předá spojení nové verzi sám. Postup (`DIR` =
+`VAULT/.doplnky/mcp-whatsapp`):
 
 1. Přečti `CHANGELOG.md` nové verze a všech mezi jeho a novou
    (`https://raw.githubusercontent.com/reditelai/mcp-whatsapp/VERZE/CHANGELOG.md`).
    Podsekce „Při aktualizaci" proveď se souhlasem uživatele.
-2. **Stáhni vedle a ověř:** novou binárku a `SHA256SUMS` (A2) do stejné
-   složky jako starou, pod jménem `SOUBOR.new` (na Windows `SOUBOR.new.exe`),
-   ověř součet a `--version`.
+2. **Stáhni vedle a ověř:** novou binárku a `SHA256SUMS` (A2) do `DIR` pod
+   jménem `SOUBOR.new` (na Windows `SOUBOR.new.exe`), ověř součet a
+   `--version`.
 3. **Vyměň přejmenováním**, ne přepsáním - běžící binárku na Windows přepsat
    nejde, přejmenovat ano:
    - starou přejmenuj na `SOUBOR.old` (Windows `SOUBOR.old.exe`),
@@ -247,16 +268,32 @@ Běžící server předá spojení nové verzi sám. Postup:
 4. **Požádej uživatele o novou konverzaci.** Nová verze se spustí, starou
    požádá o předání a ta se sama odpojí a skončí. V nové konverzaci
    `wa_status`: do pár sekund `connected`, spárování zůstává (klíče jsou
-   v datové složce). Když i po minutě hlásí `locked_by_other_instance`, drží
+   v `DIR/data`). Když i po minutě hlásí `locked_by_other_instance`, drží
    spojení verze, která předání nezná (0.1.0): ukonči ji podle
    `lock_holder_pid` (`kill PID`, na Windows `taskkill /PID PID /F`).
 5. Smaž `SOUBOR.old` a zapiš novou verzi do `system/moduly-instalovane.json`.
 
 Když cokoli selže, vrať `SOUBOR.old` na původní jméno a řekni to uživateli.
 
+### B5a. Přesun vaultu a nový počítač
+
+- **Přesun na stejném počítači:** stačí přesunout celou složku vaultu, když
+  server neběží (zavřená aplikace). Registrace je relativní, data jdou s ním.
+- **Jiný počítač nebo jiný systém:** binárka je pro konkrétní systém. Podle
+  `system/moduly-instalovane.json` stáhni binárku pro nový systém (A1, A2)
+  do stejné složky, starou smaž. Přepis hlasovek (`.doplnky/prepis`) stáhni
+  znovu přes `wa_transcription_setup`, engine je taky pro konkrétní systém.
+- **Dva počítače zároveň** (vault synchronizovaný zálohou): `.doplnky/` se
+  nezálohuje, každý počítač má vlastní instalaci. **Klíče (`data/`) mezi
+  počítači nikdy nekopíruj** - dvě stejná zařízení by se přetahovala. Na
+  druhém počítači spáruj WhatsApp znovu (je to další propojené zařízení),
+  nebo ho nech jen na jednom.
+
 ### B6. Odpojení
 
 1. `wa_logout` s `confirm: true` (odhlásí zařízení, smaže klíče).
-2. Odeber server z `.mcp.json`, nebo `claude mcp remove whatsapp --scope user`.
-3. Se souhlasem uživatele smaž `$HOME/mcp-whatsapp/` a datovou složku
-   (`~/.mcp-whatsapp/`) i s uloženými zprávami.
+2. Odeber záznam `whatsapp` z `.mcp.json`.
+3. Se souhlasem uživatele smaž `VAULT/.doplnky/mcp-whatsapp/` i s uloženými
+   zprávami. `VAULT/.doplnky/prepis/` smaž jen tehdy, když ho nepoužívá jiný
+   doplněk (`system/moduly-instalovane.json`).
+4. Odeber záznam `whatsapp` ze `system/moduly-instalovane.json`.
