@@ -34,12 +34,17 @@ MCP server, přes který asistent čte a posílá zprávy na WhatsAppu. Stojí n
 
 ## Vydání verze
 
-Nová verze se k uživatelům dostane jen releasem. Z něj ji čte info kanál Miládky (`miladka.cz/moduly.json`) a podle `CHANGELOG.md` ji Miládka u uživatele aktualizuje.
+Nová verze se k uživatelům dostane jen releasem. Z něj ji čte info kanál Miládky (`miladka.cz/moduly.json`) a podle `CHANGELOG.md` a `docs/pro-asistenta.md` ji Miládka u uživatele aktualizuje. **Všechny body níž jsou jedno vydání a dělají se spolu, jinak se aktualizace u uživatelů rozbije.**
 
-1. **Verze na třech místech:** `VERSION`, sekce `## [X.Y.Z]` v `CHANGELOG.md` (z „Nevydáno") a tag `vX.Y.Z`.
-2. **V changelogu u každé verze, co se změnilo. Piš stručně.** **První řádek sekce je souhrn jednou větou** - ten si info kanál vezme jako `zmeny`. Když aktualizace vyžaduje zásah do nastavení uživatele (nový klíč v `config.json`), přidej podsekci **„Při aktualizaci"**. **Starší sekce se nikdy nemažou.**
-3. **Pushnutý tag spustí `release.yml`**: binárky pro šest cílů, `SHA256SUMS`, release se souhrnnou větou.
-4. **Týdenní `whatsmeow.yml`** vydá patch verzi sám, jen když je sekce „Nevydáno" prázdná. Rozdělanou práci proto na `main` nenechávej dlouho - blokuje automatické aktualizace.
+1. **Dokumentace je hotová před tagem.** Info kanál posílá Miládku na `CHANGELOG.md` a `docs/pro-asistenta.md` **v tagu vydané verze**. Co se dopíše po tagu, Miládka u uživatele neuvidí.
+2. **Changelog:** sekce `## [X.Y.Z] - RRRR-MM-DD` (z „Nevydáno"). **Piš stručně.** **První řádek je souhrn jednou větou** - info kanál ho vezme jako `zmeny`. Pak pár bodů. **Starší sekce se nikdy nemažou.**
+3. **„Při aktualizaci"** - podsekce, **kdykoli má Miládka při aktualizaci něco udělat nebo ověřit** (nový klíč v `config.json`, nové ověření, přepárování). Přesné kroky, nastavení jen se souhlasem uživatele. Když není potřeba nic: „Nastavení se nemění."
+4. **Návod pro asistenta:** když se změna týká instalace nebo nastavení, uprav příslušný krok v `docs/pro-asistenta.md` i tabulku stavů. Nová instalace a aktualizace musí vést ke stejnému výsledku. README taky.
+5. **Verze na třech místech:** `VERSION`, sekce v changelogu, tag `vX.Y.Z`. `release.yml` nepustí nesoulad a přiloží binárky a `SHA256SUMS`.
+6. **Web, info kanál** (repo `web-miladka`, push do `main` = produkce, jen na Karlův pokyn): první vydání = záznam v `MODULY` v `src/lib/moduly.ts` s `id` `whatsapp`, stejným, jaké návod zapisuje do `system/moduly-instalovane.json`. Vážná chyba ve starší verzi (třeba odstřižený klient) = `minVerze`. Novinka nebo problém pro uživatele = položka v `src/kanal/info.json`. Verzi a souhrn si web bere z releasu sám.
+7. **Po vydání ověř** `https://miladka.cz/moduly.json` (drží se 10 minut).
+8. **Týdenní `whatsmeow.yml`** vydá patch verzi sám, jen když je sekce „Nevydáno" prázdná (a už existuje vydaná verze). Rozdělanou práci proto na `main` nenechávej dlouho - blokuje automatické aktualizace. Automatické vydání má „Při aktualizaci" jen tehdy, když ho někdo dopíše ručně; knihovna samotná nastavení nemění.
+9. **Čísla verzí:** do 1.0.0 se rozhraní může měnit (vždy s „Při aktualizaci"). Od 1.0.0 drží nástroje a klíče konfigurace zpětnou kompatibilitu.
 
 ## Konvence
 
