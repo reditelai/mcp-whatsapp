@@ -4,11 +4,35 @@ Tenhle návod čteš ty, asistent. Provede tě nastavením WhatsAppu s uživatel
 (část A) a prací se zprávami (část B). Uživatel terminál nevidí: co jde
 udělat bez něj, uděláš sama, a řekneš mu jen to, co musí on.
 
+Když server ještě nainstalovaný není, čteš tenhle soubor nejspíš z GitHubu:
+<https://raw.githubusercontent.com/reditelai/mcp-whatsapp/main/docs/pro-asistenta.md>.
+
 ## Zásady, než začneš
 
+- **Jedna otázka, jeden krok.** Zeptej se, počkej na odpověď, pak další.
+- **Mluv jako k laikovi.** Ne „config", „JID", „kurzor" ani „MCP server",
+  ale „soubor s nastavením", „propojené zařízení", „kde jsem skončila".
+  Technický název řekni, jen když ho uživatel uvidí na obrazovce.
+- **Příkazy spouštíš ty.** Uživatele posílej jen tam, kam nedosáhneš:
+  telefon (naskenovat QR kód), povolení serveru a nová konverzace v aplikaci
+  Claude. U každého jeho kroku řekni, co přesně udělat a co má vidět.
+- **Řekni předem, že se aplikace může ptát na povolení** příkazů a zápisů.
+  Ať povolí.
 - **Riziko řekni hned na začátku.** Server je neoficiální klient WhatsAppu.
   Podmínky WhatsAppu to zakazují a číslo může být zablokované. Doporuč
   samostatné číslo pro asistenta, ne hlavní. Rozhodnutí je na uživateli.
+- **Dva způsoby použití, zeptej se, který chce.** Server se propojí s tím
+  WhatsApp účtem, který naskenuje QR kód:
+  - **Miládka má vlastní číslo** (doporuč): druhá SIM, eSIM nebo starý
+    telefon. Uživatel jí ze svého telefonu píše a diktuje jako komukoli, ty
+    mu odpovídáš a hlídač tě budí jeho zprávami (B7). Riziko zablokování
+    nese její číslo, ne jeho.
+  - **Miládka na jeho čísle**, podobně jako u pošty: čteš jeho chaty,
+    připravuješ odpovědi a za něj posíláš jen to, co ti výslovně schválí.
+    Opatrně: každá zpráva odejde pod jeho jménem a riziko zablokování nese
+    jeho hlavní číslo. Pokyny přes WhatsApp tu nejdou, co napíše z telefonu,
+    je pro server „odeslané mnou". `owner` nevyplňuj a hlídač nabídni jen na
+    zprávy od vyjmenovaných lidí (`wake` jako seznam).
 - **Konfiguraci měníš jen se souhlasem uživatele.** Co smíš číst a kam psát,
   určuje `config.json`. Chyba `send_forbidden` je jeho nastavení, ne překážka
   k obejití.
@@ -21,6 +45,19 @@ udělat bez něj, uděláš sama, a řekneš mu jen to, co musí on.
   připomeň návrat.
 
 ## Část A - nastavení
+
+| Krok | Kdo | Co |
+|---|---|---|
+| A1, A2 | ty | zjistit systém, stáhnout a ověřit server do složky Miládky |
+| A3 | oba | riziko a způsob použití (vlastní číslo Miládky, nebo jeho), pak nastavení (navrhneš výchozí, on řekne, co chce jinak) |
+| A4, A5 | ty | zapsat nastavení a připojit server; uživatel otevře novou konverzaci a server povolí |
+| A6 | uživatel | naskenovat QR kód telefonem, který má účet pro Miládku |
+| A7 | ty | zápis instalace, kotva, denní přehled, hlídač |
+| A8 | oba | přepis hlasovek: on souhlasí se stažením, ty ho nainstaluješ |
+
+Od uživatele tedy potřebuješ jen: rozhodnutí o způsobu, pár odpovědí,
+povolení serveru v nové konverzaci, naskenování QR kódu a souhlas se
+stažením přepisu.
 
 ### A1. Prostředí a kam server patří
 
@@ -88,7 +125,13 @@ Když součet nesedí, soubor smaž a stáhni znovu. Nikdy ho nespouštěj.
 
 ### A3. Domluva o nastavení
 
-Zeptej se po jednom:
+Nejdřív riziko a způsob použití (Zásady). Pak mu **navrhni výchozí nastavení
+najednou**, lidsky. U vlastního čísla Miládky třeba: „Navrhuju: čtu všechny
+chaty, skupiny ne, psát smím jen tobě, soubory neposílám, fotky a hlasovky
+mažu po 30 dnech a pokyny beru jen z tvého čísla. Chceš něco jinak?" Jeho
+číslo (majitel) tu potřebuješ vždycky, zeptej se na něj. Na jeho čísle místo
+toho: „…psát smím jen tam, kam mi řekneš, a každou zprávu ti před odesláním
+ukážu." Po jednom pak řeš jen to, co chce jinak. Význam jednotlivých voleb:
 
 1. **Které osobní chaty smíš číst?** Doporuč: všechny (`"all"`).
 2. **Skupiny?** Doporuč: ne. Když chce, konkrétní skupiny doplníte po
@@ -153,9 +196,15 @@ registraci nerozbije):
 ```
 
 Když `.mcp.json` už existuje (třeba s `multi-gmail`), jen přidej záznam
-`whatsapp` do `mcpServers`. Pak požádej uživatele o novou konverzaci; Claude
-Code se zeptá, jestli server povolit, a uživatel povolí. V ní zavolej
-`wa_status`: čekáš `not_paired`.
+`whatsapp` do `mcpServers`. Pak požádej uživatele o novou konverzaci (běžící
+konverzace nový server nenačte) a řekni mu předem dvě věci:
+
+- aplikace Claude se v ní zeptá, jestli povolit server **whatsapp**, a má ho
+  povolit,
+- první zpráva tam bude „Pokračuj v napojení WhatsAppu".
+
+V nové konverzaci zavolej `wa_status` (čekáš `not_paired`), přečti si tenhle
+návod znovu (odkaz je v instrukcích serveru) a pokračuj A6.
 
 Když server v nové konverzaci nenaběhne a jde o relativní cestu (některá
 verze aplikace ji nenajde), dej do `command` celou cestu k binárce. Po
