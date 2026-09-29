@@ -123,14 +123,21 @@ Pak požádej uživatele o novou konverzaci. V ní zavolej `wa_status`: čekáš
 
 ### A6. Spárování
 
-1. Řekni uživateli, ať si připraví telefon: **WhatsApp → Nastavení →
-   Propojená zařízení → Propojit zařízení.** Počkej, až řekne, že má kameru
-   připravenou. Kód platí jen 20 až 60 sekund.
-2. Zavolej `wa_pair`. Obrázek ve výsledku nástroje uživatel nevidí (je ve sbaleném volání), proto mu **hned ukaž soubor z `qr_path`**:
+Párování je závod s časem: kód platí jen 20 až 60 sekund. Každá vteřina mezi
+vytvořením kódu a jeho zobrazením ubírá uživateli čas na naskenování.
+
+1. **Nejdřív všechno vysvětli** a řekni uživateli, ať si připraví telefon:
+   **WhatsApp → Nastavení → Propojená zařízení → Propojit zařízení.** Počkej,
+   až řekne, že má kameru připravenou.
+2. **Pak jako jeden rychlý krok, nic mezi tím** (žádné další nástroje,
+   kontroly ani dlouhý text): zavolej `wa_pair` a hned ukaž soubor
+   z `qr_path`. Obrázek ve výsledku nástroje uživatel nevidí, je ve sbaleném
+   volání:
    - když máš nástroj na poslání souboru uživateli, pošli ho (v Remote Control je to jediná spolehlivá cesta),
    - jinak ho otevři: Windows `start "" "CESTA"`, macOS `open "CESTA"`.
 3. Uživatel naskenuje. Když kód mezitím vyprší, zavolej `wa_pair` znovu, vrátí
-   čerstvý.
+   čerstvý. Vysvětlování a kontrolu stavu (`wa_status`) nech až na dobu po
+   naskenování.
 4. Když obrázek nejde ukázat (server bez obrazovky, vzdálený přístup), použij
    `wa_pair` s `method: "code"` a jeho číslem. Uživatel v telefonu zvolí
    **Propojit s telefonním číslem** a kód opíše.

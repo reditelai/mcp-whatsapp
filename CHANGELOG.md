@@ -5,13 +5,13 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
-<!-- Při vydání přejmenovat na: ## [0.1.0] - RRRR-MM-DD. Dokud tu něco je, týdenní aktualizace whatsmeow nevydává sama. -->
+## [0.1.0] - 2026-09-29
 
 První verze: asistent čte a posílá zprávy na WhatsAppu a nastaví ho celý z chatu.
 
 - Spárování QR kódem jako obrázkem, nebo kódem k opsání do telefonu.
 - Čtení a odesílání jen v chatech, které povoluje `config.json`, zvlášť osobní chaty a skupiny.
-- Nové zprávy od kurzoru, hledání, fotky, soubory a hlasovky ke stažení.
+- Nové zprávy od kurzoru včetně úprav a smazání, hledání, fotky, soubory a hlasovky ke stažení.
 - Čitelný stav spojení a jedna instance se spojením i při víc konverzacích.
 - Týdenní automatická aktualizace knihovny whatsmeow.
 

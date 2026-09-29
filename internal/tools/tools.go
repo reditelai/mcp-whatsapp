@@ -23,7 +23,7 @@ import (
 // Instructions are sent to the client on connect.
 const Instructions = `WhatsApp for a personal assistant. Tools are prefixed wa_.
 
-Start with wa_status. If state is not_paired or logged_out, pair with wa_pair: ask the user to open WhatsApp on the phone (Settings, Linked devices, Link a device) BEFORE calling it, because each QR code is valid for only 20-60 seconds. The image inside the tool result is usually hidden in a collapsed tool call, so show qr_path to the user right away outside of it: send it as a file if you have a tool for that (the reliable way in Remote Control), otherwise open it (Windows: start, macOS: open). After scanning, wa_status turns connected.
+Start with wa_status. If state is not_paired or logged_out, pair with wa_pair. Pairing is a race against the clock: a QR code is valid for only 20-60 seconds. So: first explain and ask the user to open WhatsApp on the phone (Settings, Linked devices, Link a device) and say when the camera is ready. Then, as one quick step with nothing in between (no other tools, checks or long text), call wa_pair and immediately show qr_path outside the tool result, because the image inside it is hidden in a collapsed tool call: send it as a file if you have a tool for that (the reliable way in Remote Control), otherwise open it (Windows: start, macOS: open). Explain and check wa_status only after the user scanned it.
 
 The server only sees chats the config allows to read, and only sends where the config allows. A send_forbidden error is the user's setting: tell them, never work around it. Send only messages the user explicitly asked you to send in this conversation.
 
@@ -41,7 +41,7 @@ func Register(s *server.MCPServer, m *wa.Manager) {
 		ro), h.status)
 
 	s.AddTool(mcp.NewTool("wa_pair",
-		mcp.WithDescription("Link this server to the user's WhatsApp. method \"qr\" (default) returns a QR code image and saves it to qr_path - open that file for the user; codes refresh every 20-60 s, call again for a fresh one. method \"code\" with phone returns an 8-character code the user types in WhatsApp (Linked devices, Link with phone number instead). Ask the user to have the phone ready before calling."),
+		mcp.WithDescription("Link this server to the user's WhatsApp. Call it only once the user has the phone camera ready, and show the result at once. method \"qr\" (default) returns a QR code image and saves it to qr_path - send or open that file for the user right away, nothing in between; codes refresh every 20-60 s, call again for a fresh one. method \"code\" with phone returns an 8-character code the user types in WhatsApp (Linked devices, Link with phone number instead). Ask the user to have the phone ready before calling."),
 		mcp.WithString("method", mcp.Enum("qr", "code"), mcp.Description("qr (default) or code")),
 		mcp.WithString("phone", mcp.Description("For method code: the WhatsApp account's number, e.g. +420777123456"))), h.pair)
 
@@ -68,7 +68,7 @@ func Register(s *server.MCPServer, m *wa.Manager) {
 		ro), h.getMessages)
 
 	s.AddTool(mcp.NewTool("wa_new_messages",
-		mcp.WithDescription("Messages new or changed after cursor across all readable chats, in order, and the next cursor. Changed means edited (edited: true, current text) or deleted for everyone (deleted: true, no text); such a message comes again with the same id. from_me: true is the user's own message. Keep the cursor and pass it next time. Without cursor returns the latest messages. has_more true means call again with the new cursor."),
+		mcp.WithDescription("Messages new or changed after cursor across all readable chats, in the order the changes happened (not by message time), and the next cursor. Changed means edited (edited: true, current text) or deleted for everyone (deleted: true, no text); such a message comes again with the same id. from_me: true is the user's own message. Keep the cursor and pass it next time. Without cursor returns the latest messages. has_more true means call again with the new cursor."),
 		mcp.WithString("cursor", mcp.Description("Cursor from the previous call")),
 		mcp.WithNumber("limit", mcp.Description("Default 100, max 500")),
 		ro), h.newMessages)
