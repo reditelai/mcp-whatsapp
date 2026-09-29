@@ -1,0 +1,73 @@
+name: Release
+
+# Vydání verze: tag vX.Y.Z = VERSION = sekce "## [X.Y.Z]" v CHANGELOG.md.
+# Vznikne GitHub Release s binárkami pro šest cílů, SHA256SUMS a souhrnnou
+# větou z changelogu. Z releasu čte info kanál Miládky
+# (miladka.cz/moduly.json) verzi a změny. Pravidla: CLAUDE.md, Vydání verze.
+on:
+  push:
+    tags: ['v*']
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Verze a popis změn
+        run: |
+          VERZE="${TAG#v}"
+          if [ "$(tr -d '[:space:]' < VERSION)" != "$VERZE" ]; then
+            echo "VERSION má $(cat VERSION), tag je $VERZE" >&2
+            exit 1
+          fi
+          awk -v v="$VERZE" '
+            index($0, "## [" v "]") == 1 { uvnitr = 1; next }
+            uvnitr && index($0, "## [") == 1 { exit }
+            uvnitr { print }
+          ' CHANGELOG.md > sekce.md
+          SOUHRN=$(grep -m1 -v '^[[:space:]]*$' sekce.md || true)
+          if [ -z "$SOUHRN" ]; then
+            echo "CHANGELOG.md nemá sekci ## [$VERZE] se souhrnnou větou" >&2
+            exit 1
+          fi
+          printf '%s\n\nPodrobně v [CHANGELOG.md](https://github.com/%s/blob/%s/CHANGELOG.md).\n' \
+            "$SOUHRN" "$GITHUB_REPOSITORY" "$TAG" > zmeny.md
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          mkdir dist
+          for t in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            os=${t%/*}; arch=${t#*/}; ext=""
+            [ "$os" = windows ] && ext=".exe"
+            GOOS=$os GOARCH=$arch go build -trimpath -ldflags="-s -w" \
+              -o "dist/mcp-whatsapp-$os-$arch$ext" ./cmd/mcp-whatsapp
+          done
+          (cd dist && sha256sum * > SHA256SUMS)
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          body_path: zmeny.md
+          files: dist/*

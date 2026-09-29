@@ -1,0 +1,25 @@
+# Credentials, session keys and configuration with real values.
+# These patterns exist from the first commit on purpose: a secret that
+# reaches the history cannot be removed from it.
+.env
+.env.*
+config.json*
+config.local.*
+credentials*
+*.db
+*.db-*
+*.sqlite3
+pair-qr.png
+media/
+
+# Local toolchain helpers and build output
+.goenv
+/mcp-whatsapp
+/mcp-whatsapp.exe
+dist/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

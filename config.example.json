@@ -1,0 +1,6 @@
+{
+  "read": { "chats": "all", "groups": false },
+  "send": { "chats": ["+420777123456"], "groups": false, "files": [] },
+  "history_sync": false,
+  "device_name": "Miládka"
+}

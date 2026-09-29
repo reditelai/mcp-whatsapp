@@ -1,0 +1,97 @@
+name: Aktualizace whatsmeow
+
+# WhatsApp průběžně odstřihává staré verze klienta. Jednou týdně se knihovna
+# whatsmeow aktualizuje na poslední verzi; když testy projdou, vyjde nová
+# patch verze sama. Když ne (nebo na main čekají nevydané změny), vznikne
+# issue, ať se to nedozví až uživatel. Viz SPEC.md, Údržba.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.vydani.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Aktualizace
+        id: zmena
+        run: |
+          go get go.mau.fi/whatsmeow@latest
+          go mod tidy
+          if git diff --quiet go.mod go.sum; then
+            echo "zmena=ne" >> "$GITHUB_OUTPUT"
+          else
+            echo "zmena=ano" >> "$GITHUB_OUTPUT"
+            grep 'go.mau.fi/whatsmeow ' go.mod | awk '{print $2}' > /tmp/whatsmeow-verze
+          fi
+
+      - name: Test
+        if: steps.zmena.outputs.zmena == 'ano'
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          go vet ./...
+          go test ./...
+          for t in linux/amd64 darwin/arm64 windows/amd64; do
+            GOOS=${t%/*} GOARCH=${t#*/} go build -trimpath -o /dev/null ./cmd/mcp-whatsapp
+          done
+
+      - name: Vydání
+        id: vydani
+        if: steps.zmena.outputs.zmena == 'ano'
+        run: |
+          # Automaticky se vydává jen tehdy, když na main nečekají ručně
+          # rozdělané změny (sekce Nevydáno je prázdná).
+          NEVYDANO=$(awk '/^## \[Nevydáno\]/{u=1;next} u&&/^## \[/{exit} u' CHANGELOG.md | grep -v '^[[:space:]]*$' | grep -v '^<!--' || true)
+          if [ -n "$NEVYDANO" ]; then
+            echo "Na main čekají nevydané změny, automatické vydání se neprovede." >&2
+            exit 1
+          fi
+          STARA=$(tr -d '[:space:]' < VERSION)
+          NOVA=$(echo "$STARA" | awk -F. '{print $1"."$2"."$3+1}')
+          DNES=$(date -u +%Y-%m-%d)
+          echo "$NOVA" > VERSION
+          awk -v v="$NOVA" -v d="$DNES" -v w="$(cat /tmp/whatsmeow-verze)" '
+            { print }
+            /^## \[Nevydáno\]/ && !hotovo {
+              print ""
+              print "## [" v "] - " d
+              print ""
+              print "Aktualizace knihovny whatsmeow, aby spojení s WhatsAppem dál fungovalo."
+              print ""
+              print "- whatsmeow " w "."
+              hotovo = 1
+            }
+          ' CHANGELOG.md > CHANGELOG.new && mv CHANGELOG.new CHANGELOG.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "whatsmeow $(cat /tmp/whatsmeow-verze), verze $NOVA"
+          git tag "v$NOVA"
+          git push origin HEAD "v$NOVA"
+          echo "tag=v$NOVA" >> "$GITHUB_OUTPUT"
+
+      - name: Issue při selhání
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Aktualizace whatsmeow selhala ($(date -u +%Y-%m-%d))" \
+            --body "Týdenní aktualizace knihovny whatsmeow neprošla: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Dokud se nevydá nová verze, hrozí, že WhatsApp server odstřihne jako zastaralého klienta."
+
+  release:
+    needs: bump
+    if: needs.bump.outputs.tag != ''
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.bump.outputs.tag }}
