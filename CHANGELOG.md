@@ -14,3 +14,7 @@ První verze: asistent čte a posílá zprávy na WhatsAppu a nastaví ho celý 
 - Nové zprávy od kurzoru, hledání, fotky, soubory a hlasovky ke stažení.
 - Čitelný stav spojení a jedna instance se spojením i při víc konverzacích.
 - Týdenní automatická aktualizace knihovny whatsmeow.
+
+### Při aktualizaci
+
+- První vydaná verze, není z čeho aktualizovat. U Věrky nahrazuje server `wadb`: postup je v `docs/pro-asistenta.md`, část A.

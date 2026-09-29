@@ -78,6 +78,10 @@ jobs:
               print "Aktualizace knihovny whatsmeow, aby spojení s WhatsAppem dál fungovalo."
               print ""
               print "- whatsmeow " w "."
+              print ""
+              print "### Při aktualizaci"
+              print ""
+              print "- Nastavení se nemění. Stačí vyměnit binárku (návod, Aktualizace)."
               hotovo = 1
             }
           ' CHANGELOG.md > CHANGELOG.new && mv CHANGELOG.new CHANGELOG.md

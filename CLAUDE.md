@@ -44,7 +44,13 @@ Nová verze se k uživatelům dostane jen releasem. Z něj ji čte info kanál M
 6. **Web, info kanál** (repo `web-miladka`, push do `main` = produkce, jen na Karlův pokyn): první vydání = záznam v `MODULY` v `src/lib/moduly.ts` s `id` `whatsapp`, stejným, jaké návod zapisuje do `system/moduly-instalovane.json`. Vážná chyba ve starší verzi (třeba odstřižený klient) = `minVerze`. Novinka nebo problém pro uživatele = položka v `src/kanal/info.json`. Verzi a souhrn si web bere z releasu sám.
 7. **Po vydání ověř** `https://miladka.cz/moduly.json` (drží se 10 minut).
 8. **Týdenní `whatsmeow.yml`** vydá patch verzi sám, jen když je sekce „Nevydáno" prázdná (a už existuje vydaná verze). Rozdělanou práci proto na `main` nenechávej dlouho - blokuje automatické aktualizace. Automatické vydání má „Při aktualizaci" jen tehdy, když ho někdo dopíše ručně; knihovna samotná nastavení nemění.
-9. **Čísla verzí:** do 1.0.0 se rozhraní může měnit (vždy s „Při aktualizaci"). Od 1.0.0 drží nástroje a klíče konfigurace zpětnou kompatibilitu.
+9. **Čísla verzí:** do 1.0.0 se rozhraní může měnit (vždy s „Při aktualizaci"). Od 1.0.0 drží nástroje a klíče konfigurace zpětnou kompatibilitu. Stejný seznam je v `miladka-vyvoj/CLAUDE.md`; když se tady změní, změň ho tam.
+10. **Článek na webu:** když se mění, co dělá uživatel (kroky instalace, co musí nastavit, co uvidí), uprav článek na miladka.cz v repu `web-miladka` (`src/clanky/`, CS i EN; evidence v `miladka-vyvoj/clanky.md`).
+11. **Test celé cesty před tagem:** aktualizace z předchozí verze podle changelogu a návodu (na Karlově nebo Věrčině instalaci), a když se změnila instalace, i nová instalace. Návod, který v půlce nefunguje, se k uživatelům nesmí dostat.
+12. **Závislost na verzi Miládky:** když modul potřebuje soubory nebo pravidla z novější verze balíčku, napiš to do návodu (oddíl pro danou verzi Miládky) i do „Při aktualizaci", a starší Miládku ať návod zastaví s vysvětlením.
+13. **Zápis ve vývoji:** `miladka-vyvoj` - `CHANGELOG-vyvoj.md` (co vyšlo a proč), `_vyvoj/STAV.md`, katalog v `_vyvoj/moduly.md` (stav a verze).
+
+**Hlídá automat:** release workflow neprojde bez souhrnné věty a bez podsekce „Při aktualizaci" v sekci verze a bez souhlasu verzí; týdenní aktualizace „Při aktualizaci" dopisuje sama; po vydání 20 minut čeká, až verzi ukáže `miladka.cz/moduly.json`, a když ne, založí issue. Body 1, 4, 6 a 10 až 13 hlídá jen tenhle seznam.
 
 ## Konvence
 
