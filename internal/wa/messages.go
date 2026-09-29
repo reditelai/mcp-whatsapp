@@ -152,17 +152,28 @@ func (m *Manager) onMessage(evt *events.Message, history bool) {
 	if kind == policy.KindGroup && cli != nil {
 		m.fetchGroupName(cli, chat.jid)
 	}
-	if inserted && len(nm.MediaRef) > 0 && nm.MediaSize <= autoDownloadLimit && !history {
+	if !inserted || history {
+		return
+	}
+	// A voice note goes into the conversation with its transcript, when
+	// transcription is installed; everything else right away.
+	waitForTranscript := nm.Kind == "voice" && m.stt.Ready()
+	if len(nm.MediaRef) > 0 && nm.MediaSize <= autoDownloadLimit {
 		go func() {
 			if _, err := m.downloadMedia(context.Background(), chatKey, nm.ID); err != nil {
 				m.log.Warnf("media %s: %v", nm.ID, err)
+				m.push(context.Background(), chatKey, nm.ID)
 				return
 			}
-			if nm.Kind == "voice" {
+			if waitForTranscript {
 				m.enqueueTranscript(chatKey, nm.ID)
+			} else {
+				m.push(context.Background(), chatKey, nm.ID)
 			}
 		}()
+		return
 	}
+	m.push(ctx, chatKey, nm.ID)
 }
 
 func kindName(k policy.Kind) string {
@@ -181,6 +192,7 @@ func fillContent(nm *appstore.NewMessage, msg *waE2E.Message) {
 	media := func(kind string, parent *waE2E.Message, mimeType, name, caption string, size uint64, ci *waE2E.ContextInfo) {
 		nm.Kind, nm.Text, nm.MediaMime, nm.MediaName, nm.MediaSize = kind, caption, mimeType, name, int64(size)
 		nm.QuotedID = ci.GetStanzaID()
+		nm.Forwarded = ci.GetIsForwarded()
 		if raw, err := proto.Marshal(parent); err == nil {
 			nm.MediaRef = raw
 		}
@@ -237,7 +249,9 @@ func fillContent(nm *appstore.NewMessage, msg *waE2E.Message) {
 	default:
 		if t := textOf(msg); t != "" {
 			nm.Kind, nm.Text = "text", t
-			nm.QuotedID = msg.GetExtendedTextMessage().GetContextInfo().GetStanzaID()
+			ci := msg.GetExtendedTextMessage().GetContextInfo()
+			nm.QuotedID = ci.GetStanzaID()
+			nm.Forwarded = ci.GetIsForwarded()
 		}
 	}
 }

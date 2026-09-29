@@ -65,6 +65,8 @@ type Manager struct {
 
 	jobs chan transcriptJob
 
+	notify func(method string, params map[string]any) // claude/channel
+
 	lock *flock.Flock
 
 	pairMu sync.Mutex // one wa_pair at a time

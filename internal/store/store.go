@@ -134,6 +134,8 @@ CREATE TABLE IF NOT EXISTS messages (
 	rev          INTEGER NOT NULL DEFAULT 0,
 	transcript   TEXT NOT NULL DEFAULT '',
 	transcript_status TEXT NOT NULL DEFAULT '',
+	forwarded    INTEGER NOT NULL DEFAULT 0,
+	pushed       INTEGER NOT NULL DEFAULT 0,
 	UNIQUE (chat_jid, id)
 );
 CREATE INDEX IF NOT EXISTS messages_chat_ts ON messages (chat_jid, ts);
@@ -159,6 +161,8 @@ func (s *Store) migrate() error {
 		{"messages", "rev", `ALTER TABLE messages ADD COLUMN rev INTEGER NOT NULL DEFAULT 0; UPDATE messages SET rev = seq`},
 		{"messages", "transcript", `ALTER TABLE messages ADD COLUMN transcript TEXT NOT NULL DEFAULT ''`},
 		{"messages", "transcript_status", `ALTER TABLE messages ADD COLUMN transcript_status TEXT NOT NULL DEFAULT ''`},
+		{"messages", "forwarded", `ALTER TABLE messages ADD COLUMN forwarded INTEGER NOT NULL DEFAULT 0`},
+		{"messages", "pushed", `ALTER TABLE messages ADD COLUMN pushed INTEGER NOT NULL DEFAULT 0`},
 	} {
 		var n int
 		if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, c.table, c.name).Scan(&n); err != nil {
@@ -212,6 +216,11 @@ type Message struct {
 	// "failed: …", "" when transcription is not installed).
 	Transcript       string `json:"transcript,omitempty"`
 	TranscriptStatus string `json:"transcript_status,omitempty"`
+	// Forwarded: the sender passed on someone else's message - its content
+	// is not the sender's own words. Pushed: already delivered straight into
+	// a conversation (claude/channel).
+	Forwarded bool `json:"forwarded,omitempty"`
+	Pushed    bool `json:"pushed,omitempty"`
 
 	// Addresses exactly as WhatsApp sent them (possibly LIDs); receipts and
 	// reply quotes must use these, not the rewritten phone-number form.
@@ -234,6 +243,7 @@ type NewMessage struct {
 	MediaSize                           int64
 	MediaRef                            []byte
 	RawChat, RawSender                  string
+	Forwarded                           bool
 }
 
 // SaveMessage stores a message and upserts its chat. A message that is
@@ -249,10 +259,10 @@ func (s *Store) SaveMessage(ctx context.Context, m NewMessage) (inserted bool, e
 	}
 	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO messages
 		(chat_jid, id, sender_jid, sender_phone, sender_name, from_me, ts, kind, text, quoted_id,
-		 media_mime, media_name, media_size, media_ref, raw_chat, raw_sender, rev)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,`+nextRev+`)`,
+		 media_mime, media_name, media_size, media_ref, raw_chat, raw_sender, forwarded, rev)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,`+nextRev+`)`,
 		m.Chat, m.ID, m.SenderJID, m.SenderPhone, m.SenderName, b2i(m.FromMe), m.Time.Unix(),
-		m.Kind, m.Text, m.QuotedID, m.MediaMime, m.MediaName, m.MediaSize, m.MediaRef, m.RawChat, m.RawSender)
+		m.Kind, m.Text, m.QuotedID, m.MediaMime, m.MediaName, m.MediaSize, m.MediaRef, m.RawChat, m.RawSender, b2i(m.Forwarded))
 	if err != nil {
 		return false, err
 	}
@@ -331,7 +341,7 @@ func (s *Store) SetMediaPath(ctx context.Context, chat, id, path string) (bool, 
 
 const msgCols = `rev, chat_jid, id, sender_jid, sender_phone, sender_name, from_me, ts, kind, text,
 	quoted_id, media_mime, media_name, media_size, media_path, edited, deleted, media_ref, raw_chat, raw_sender,
-	transcript, transcript_status`
+	transcript, transcript_status, forwarded, pushed`
 
 func (s *Store) scanMessages(rows *sql.Rows) ([]Message, error) {
 	ms, err := scanMessages(rows)
@@ -346,14 +356,14 @@ func scanMessages(rows *sql.Rows) ([]Message, error) {
 	var out []Message
 	for rows.Next() {
 		var m Message
-		var fromMe, edited, deleted int
+		var fromMe, edited, deleted, forwarded, pushed int
 		var ts int64
 		if err := rows.Scan(&m.Rev, &m.Chat, &m.ID, &m.SenderJID, &m.SenderPhone, &m.SenderName, &fromMe,
 			&ts, &m.Kind, &m.Text, &m.QuotedID, &m.MediaMime, &m.MediaName, &m.MediaSize, &m.MediaPath,
-			&edited, &deleted, &m.mediaRef, &m.RawChat, &m.RawSender, &m.Transcript, &m.TranscriptStatus); err != nil {
+			&edited, &deleted, &m.mediaRef, &m.RawChat, &m.RawSender, &m.Transcript, &m.TranscriptStatus, &forwarded, &pushed); err != nil {
 			return nil, err
 		}
-		m.FromMe, m.Edited, m.Deleted = fromMe == 1, edited == 1, deleted == 1
+		m.FromMe, m.Edited, m.Deleted, m.Forwarded, m.Pushed = fromMe == 1, edited == 1, deleted == 1, forwarded == 1, pushed == 1
 		m.SenderPhone = plus(m.SenderPhone)
 		m.ts = time.Unix(ts, 0)
 		m.Time = m.ts.UTC().Format(time.RFC3339)
@@ -422,6 +432,17 @@ func (s *Store) Latest(ctx context.Context, limit int) ([]Message, error) {
 		return nil, err
 	}
 	return s.scanMessages(rows)
+}
+
+// MarkPushed records that a message was delivered into a conversation. It
+// reports false when it already was (so it is pushed only once).
+func (s *Store) MarkPushed(ctx context.Context, chat, id string) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE messages SET pushed = 1 WHERE chat_jid = ? AND id = ? AND pushed = 0`, chat, id)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }
 
 // ExpiredMedia returns messages with a downloaded file older than before.

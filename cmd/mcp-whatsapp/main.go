@@ -58,8 +58,12 @@ func main() {
 	s := server.NewMCPServer("mcp-whatsapp", mcpwhatsapp.Version(),
 		server.WithToolCapabilities(false),
 		server.WithInstructions(tools.Instructions),
+		// Incoming messages straight into the conversation where the client
+		// supports it (Claude Code channels); ignored elsewhere.
+		server.WithExperimental(map[string]any{"claude/channel": map[string]any{}}),
 	)
 	tools.Register(s, m)
+	m.SetNotifier(s.SendNotificationToAllClients)
 	if err := server.ServeStdio(s, server.WithErrorLogger(log.New(os.Stderr, "mcp: ", log.LstdFlags))); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}

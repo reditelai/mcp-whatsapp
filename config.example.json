@@ -1,6 +1,7 @@
 {
   "read": { "chats": "all", "groups": false },
   "send": { "chats": ["+420777123456"], "groups": false, "files": [] },
+  "owner": ["+420777123456"],
   "media_dir": "vstupy/whatsapp",
   "media_keep_days": 30,
   "history_sync": false,

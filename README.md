@@ -25,6 +25,9 @@ Doporučujeme proto pro asistenta samostatné číslo, ne tvoje hlavní.
   si nastavení sám nepřepíše.
 - **Nové zprávy od kurzoru**, hledání v uložených zprávách, fotky, soubory
   a hlasovky ke stažení.
+- **Píšeš a diktuješ asistentovi z telefonu.** Pokyny bere jen od tvého
+  čísla, zprávy ostatních jsou pro něj jen informace. V terminálu mu zprávy
+  chodí rovnou do konverzace, v aplikaci Claude je hlídá pravidelně.
 - **Přepis hlasovek na text přímo v počítači.** Nic neodchází ven. Model se
   stáhne jednou (asi 510 MB), až k tomu dáš souhlas.
 - **Čitelný stav:** zastaralý klient, odhlášení z telefonu, výpadek sítě
@@ -74,6 +77,8 @@ S Miládkou to všechno udělá asistent podle `docs/pro-asistenta.md`.
 | `device_name` | jméno zařízení v telefonu v Propojených zařízeních |
 | `transcription.enabled` | přepis hlasovek; výchozí `true`, platí až po instalaci (`wa_transcription_setup`) |
 | `transcription.threads`, `transcription.batch` | vlákna a počet úseků najednou; výchozí 2 a 2 (asi 1,3 GB paměti). Na slabém stroji `batch: 1` |
+| `owner` | tvoje čísla (`+420…`): jen jejich zprávy jsou pro asistenta pokyny; musí být v `read.chats` |
+| `channel.notify` | které zprávy jdou rovnou do konverzace (Claude Code v terminálu s kanály): `"owner"` (výchozí), `"all"`, `"off"` |
 | `media_dir` | kam se ukládají fotky, hlasovky a dokumenty; výchozí `data/media`, s Miládkou `vstupy/whatsapp` |
 | `media_keep_days` | po kolika dnech se stažená média smažou (text a přepis zůstanou); výchozí 30, `0` = nikdy |
 | `data_dir` | kde leží data serveru; výchozí `data/` vedle binárky |

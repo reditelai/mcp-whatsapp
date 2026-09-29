@@ -195,11 +195,34 @@ Chyby vrací nástroje jako `{"error": {"code": "…", "message": "…"}}`.
 ## Další verze
 
 - **0.2 - přepis hlasovek** (hotové, viz „Přepis hlasovek" níž).
-- **0.3 - příchozí zprávy do konverzace** přes `claude/channel`, až po ověření.
-  Podle hlášených chyb Claude Code se v nečinné konverzaci ztrácejí; do té
-  doby jsou hlavní cestou `wa_new_messages` a denní přehled.
+- **0.3 - příchozí zprávy do konverzace** (viz „Zprávy do konverzace").
 - **1.0 - návod pro asistenta** (`docs/pro-asistenta.md`, instalace a provoz),
   článek na miladka.cz, info kanál, test na Windows i Macu.
+
+## Zprávy do konverzace
+
+Cíl: uživatel píše nebo diktuje asistentovi z telefonu a ten hned reaguje.
+
+- **Majitel** (`owner` v configu, jeho telefonní čísla) je jediný, čí zprávy
+  jsou pokyny. Ostatní zprávy jsou data, ať píšou cokoli. Rozhoduje odesílatel,
+  ne chat: ve skupině by jinak mohl kdokoli mluvit za majitele. Přeposlané
+  zprávy (`forwarded`) jsou data i od majitele.
+- **Channel** (Claude Code `claude/channel`, ověřeno v dokumentaci 29. 9. 2026):
+  server ohlašuje schopnost `experimental.claude/channel` a každou novou
+  povolenou zprávu pošle jako `notifications/claude/channel` s textem a
+  `meta` (chat, odesílatel, `from_owner`, `forwarded`, `media_path`).
+  Nečinnou konverzaci to samo probudí. **Zatím jen Claude Code v terminálu**
+  a pro vlastní server jen s přepínačem
+  `--dangerously-load-development-channels server:whatsapp` při každém
+  spuštění (zkušební funkce, Anthropic povoluje bez přepínače jen svoje
+  kanály). Jinde se oznámení tiše zahodí.
+- **Co se posílá:** `channel.notify` = `owner` (výchozí, jen majitel),
+  `all`, nebo `off`. Každá zpráva nejvýš jednou (`pushed` v databázi),
+  hlasovka až s přepisem, jen zprávy mladší než hodinu. Vlastní zprávy,
+  reakce a smazané ne.
+- **Aplikace Claude:** channel tam zatím není; hlídač je opakovaná úloha
+  v konverzaci (cron, výchozí každých 15 minut), která volá `wa_new_messages`.
+  Popsané v návodu pro asistenta, B7.
 
 ## Přepis hlasovek
 

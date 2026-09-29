@@ -36,6 +36,13 @@ type Config struct {
 	HistorySync bool
 	DeviceName  string
 
+	// Owners are the phone numbers whose messages are the user's own
+	// requests; everyone else's messages are data, never instructions.
+	Owners []string
+	// Notify: which incoming messages go straight into the conversation
+	// (claude/channel): "owner" (default), "all" or "off".
+	Notify string
+
 	Transcription Transcription
 }
 
@@ -76,6 +83,10 @@ type rawConfig struct {
 	Send        *rawScope `json:"send"`
 	HistorySync bool      `json:"history_sync"`
 	DeviceName  string    `json:"device_name"`
+	Owner       []string  `json:"owner"`
+	Channel     *struct {
+		Notify string `json:"notify"`
+	} `json:"channel"`
 
 	Transcription *struct {
 		Enabled *bool  `json:"enabled"`
@@ -192,6 +203,26 @@ func parseWith(data []byte, path, bin string) (*Config, error) {
 		}
 	}
 	errs = checkSendWithinRead(cfg.Read, cfg.Send, errs)
+	for _, o := range raw.Owner {
+		n, err := normalizePhone(o)
+		if err != nil {
+			errs = append(errs, "owner: "+err.Error())
+			continue
+		}
+		if !cfg.Read.AllChats && !contains(cfg.Read.Chats, n) {
+			errs = append(errs, fmt.Sprintf("owner +%s není v read.chats - server by jeho zprávy nečetl", n))
+		}
+		cfg.Owners = append(cfg.Owners, n)
+	}
+	cfg.Notify = "owner"
+	if raw.Channel != nil && raw.Channel.Notify != "" {
+		cfg.Notify = raw.Channel.Notify
+	}
+	switch cfg.Notify {
+	case "owner", "all", "off":
+	default:
+		errs = append(errs, `channel.notify: čeká "owner", "all" nebo "off"`)
+	}
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("%s není platná konfigurace:\n  %s", path, strings.Join(errs, "\n  "))
 	}

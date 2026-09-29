@@ -5,6 +5,18 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+Z telefonu rovnou do konverzace: zprávy a hlasovky majitele jdou asistentovi hned, pokyny bere jen od něj.
+
+- Nová volba `owner` (čísla majitele): jen jeho zprávy jsou pro asistenta pokyny, zprávy ostatních a přeposlané zprávy jsou jen informace.
+- Příchozí zprávy jdou rovnou do konverzace přes Claude Code channel (zatím Claude Code v terminálu s `--dangerously-load-development-channels server:whatsapp`). Volba `channel.notify`: `owner` (výchozí), `all`, `off`. Hlasovka až s přepisem.
+- V aplikaci Claude hlídá nové zprávy opakovaná kontrola (návod B7).
+- Zprávy nesou `forwarded` a `pushed`.
+
+### Při aktualizaci
+
+- Se souhlasem uživatele doplň do configu `"owner": ["+420…"]` s jeho číslem (musí být v `read.chats`). Bez `owner` server do konverzace nic neposílá a žádná zpráva není pokyn.
+- Nastav hlídání nových zpráv podle návodu B7 (terminál: přepínač při spuštění, aplikace: hlídač).
+
 ## [0.2.0] - 2026-09-29
 
 Hlasovky jako text: přepis přímo v počítači, a aktualizace, při které nová verze převezme spojení sama.

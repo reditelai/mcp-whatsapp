@@ -50,3 +50,16 @@ func TestDefaultDirs(t *testing.T) {
 		t.Fatalf("vault relative: %v %+v", err, c)
 	}
 }
+
+func TestOwner(t *testing.T) {
+	c, err := Parse([]byte(`{"read":{"chats":"all"},"owner":["+420 724 000 111"]}`), "x")
+	if err != nil || len(c.Owners) != 1 || c.Owners[0] != "420724000111" || c.Notify != "owner" {
+		t.Fatalf("%v %+v", err, c)
+	}
+	if _, err := Parse([]byte(`{"read":{"chats":["+420777000111"]},"owner":["+420724000111"]}`), "x"); err == nil {
+		t.Fatal("owner outside read accepted")
+	}
+	if _, err := Parse([]byte(`{"channel":{"notify":"vse"}}`), "x"); err == nil {
+		t.Fatal("bad notify accepted")
+	}
+}
