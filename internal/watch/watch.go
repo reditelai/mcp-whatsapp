@@ -121,10 +121,10 @@ func Run(ctx context.Context, cfg *config.Config, cursor int64, o Options, out i
 
 		now := time.Now()
 		n, owner, untranscribed, err := w.scan(ctx, now)
-		if err != nil {
-			return say(ExitUsage, "chyba: databáze zpráv nejde číst: %v", err)
+		if ctx.Err() != nil {
+			return say(ExitReplaced, "konec: hlídač byl ukončen")
 		}
-		if n > 0 {
+		if err == nil && n > 0 {
 			line := fmt.Sprintf("nové zprávy: %d", n)
 			if cfg.Wake == "all" {
 				line += fmt.Sprintf(", z toho od majitele %d", owner)
@@ -135,7 +135,18 @@ func Run(ctx context.Context, cfg *config.Config, cursor int64, o Options, out i
 			return say(ExitMessages, "%s. Zavolej wa_new_messages s kurzorem %s.", line, strconv.FormatInt(cursor, 10))
 		}
 
-		if p := w.problem(ctx, now); p == "" {
+		// A read error is a problem like the others: reported only when it
+		// lasts, a moment of a busy database must not wake the assistant.
+		var p string
+		if err != nil {
+			p = "databáze zpráv nejde číst: " + err.Error()
+		} else {
+			p = w.problem(ctx, now)
+		}
+		if ctx.Err() != nil {
+			return say(ExitReplaced, "konec: hlídač byl ukončen")
+		}
+		if p == "" {
 			problemSince = time.Time{}
 		} else if problemSince.IsZero() {
 			problemSince = now

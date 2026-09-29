@@ -63,10 +63,14 @@ func (e *env) cursor() int64 {
 
 // run starts a watcher and returns a function that waits for its result.
 func (e *env) run(cursor int64, limit time.Duration) func() (int, string) {
+	return e.runWith(fast, cursor, limit)
+}
+
+func (e *env) runWith(o Options, cursor int64, limit time.Duration) func() (int, string) {
 	ctx, cancel := context.WithTimeout(context.Background(), limit)
 	var out bytes.Buffer
 	done := make(chan int, 1)
-	go func() { done <- Run(ctx, e.cfg, cursor, fast, &out) }()
+	go func() { done <- Run(ctx, e.cfg, cursor, o, &out) }()
 	return func() (int, string) {
 		defer cancel()
 		code := <-done
@@ -113,8 +117,10 @@ func TestVoiceWaitsForTranscript(t *testing.T) {
 	e := newEnv(t, "")
 	c := e.cursor()
 	e.save("v", owner, "voice", false, "pending")
-	wait := e.run(c, 2*time.Second)
-	time.Sleep(100 * time.Millisecond) // well under VoiceWait
+	slow := fast
+	slow.VoiceWait = time.Minute // the transcript surely comes first
+	wait := e.runWith(slow, c, 5*time.Second)
+	time.Sleep(100 * time.Millisecond)
 	if err := e.st.SetTranscript(context.Background(), owner+"@s.whatsapp.net", "v", "ahoj", "done"); err != nil {
 		t.Fatal(err)
 	}
@@ -167,14 +173,23 @@ func TestProblemStates(t *testing.T) {
 
 func TestNewerWatcherTakesOver(t *testing.T) {
 	e := newEnv(t, "")
-	first := e.run(e.cursor(), 2*time.Second)
-	time.Sleep(50 * time.Millisecond)
+	first := e.run(e.cursor(), 5*time.Second)
+	claim := claimPath(e.cfg.DataDir)
+	for i := 0; ; i++ { // the first one must be running before the second starts
+		if _, err := os.Stat(claim); err == nil {
+			break
+		}
+		if i > 500 {
+			t.Fatal("first watcher did not start")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	second := e.run(e.cursor(), 300*time.Millisecond)
 	if code, out := first(); code != ExitReplaced || !strings.Contains(out, "převzal") {
 		t.Fatalf("first: %d %q", code, out)
 	}
 	second()
-	if _, err := os.Stat(claimPath(e.cfg.DataDir)); !os.IsNotExist(err) {
+	if _, err := os.Stat(claim); !os.IsNotExist(err) {
 		t.Fatalf("claim left behind: %v", err)
 	}
 }
