@@ -98,8 +98,67 @@ func Open(path string) (*Store, error) {
 	return s, nil
 }
 
+// OpenReader opens an existing app.db for reading only, without migrating
+// it: the waiting mode (--wait) reads while the server writes.
+func OpenReader(path string) (*Store, error) {
+	if _, err := os.Stat(path); err != nil {
+		return nil, err
+	}
+	v := url.Values{}
+	v.Add("_pragma", "busy_timeout(5000)")
+	v.Add("_pragma", "query_only(1)")
+	db, err := sql.Open("sqlite", "file:"+path+"?"+v.Encode())
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return &Store{db: db}, nil
+}
+
 // Close closes the database.
 func (s *Store) Close() error { return s.db.Close() }
+
+// ServerState is the connection state the instance holding the lock
+// publishes for the waiting mode, with a heartbeat in Updated.
+type ServerState struct {
+	State   string
+	Error   string
+	Since   time.Time
+	PID     int
+	Version string
+	Updated time.Time
+}
+
+// SetServerState stores the current state (one row).
+func (s *Store) SetServerState(ctx context.Context, st ServerState) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO server (id, state, error, since, pid, version, updated)
+		VALUES (1,?,?,?,?,?,?)
+		ON CONFLICT (id) DO UPDATE SET state = excluded.state, error = excluded.error, since = excluded.since,
+			pid = excluded.pid, version = excluded.version, updated = excluded.updated`,
+		st.State, st.Error, st.Since.Unix(), st.PID, st.Version, st.Updated.Unix())
+	return err
+}
+
+// GetServerState returns the published state, ErrNotFound when no server
+// has published one yet.
+func (s *Store) GetServerState(ctx context.Context) (*ServerState, error) {
+	var st ServerState
+	var since, updated int64
+	err := s.db.QueryRowContext(ctx, `SELECT state, error, since, pid, version, updated FROM server WHERE id = 1`).
+		Scan(&st.State, &st.Error, &since, &st.PID, &st.Version, &updated)
+	if errors.Is(err, sql.ErrNoRows) || (err != nil && strings.Contains(err.Error(), "no such table")) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	st.Since, st.Updated = time.Unix(since, 0), time.Unix(updated, 0)
+	return &st, nil
+}
 
 const schema = `
 CREATE TABLE IF NOT EXISTS chats (
@@ -135,7 +194,6 @@ CREATE TABLE IF NOT EXISTS messages (
 	transcript   TEXT NOT NULL DEFAULT '',
 	transcript_status TEXT NOT NULL DEFAULT '',
 	forwarded    INTEGER NOT NULL DEFAULT 0,
-	pushed       INTEGER NOT NULL DEFAULT 0,
 	UNIQUE (chat_jid, id)
 );
 CREATE INDEX IF NOT EXISTS messages_chat_ts ON messages (chat_jid, ts);
@@ -149,6 +207,15 @@ CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE OF text ON messages BEGIN
 	INSERT INTO messages_fts (messages_fts, rowid, text) VALUES ('delete', old.seq, old.text);
 	INSERT INTO messages_fts (rowid, text) VALUES (new.seq, new.text);
 END;
+CREATE TABLE IF NOT EXISTS server (
+	id      INTEGER PRIMARY KEY CHECK (id = 1),
+	state   TEXT NOT NULL,
+	error   TEXT NOT NULL DEFAULT '',
+	since   INTEGER NOT NULL,
+	pid     INTEGER NOT NULL,
+	version TEXT NOT NULL,
+	updated INTEGER NOT NULL
+);
 `
 
 func (s *Store) migrate() error {
@@ -162,7 +229,6 @@ func (s *Store) migrate() error {
 		{"messages", "transcript", `ALTER TABLE messages ADD COLUMN transcript TEXT NOT NULL DEFAULT ''`},
 		{"messages", "transcript_status", `ALTER TABLE messages ADD COLUMN transcript_status TEXT NOT NULL DEFAULT ''`},
 		{"messages", "forwarded", `ALTER TABLE messages ADD COLUMN forwarded INTEGER NOT NULL DEFAULT 0`},
-		{"messages", "pushed", `ALTER TABLE messages ADD COLUMN pushed INTEGER NOT NULL DEFAULT 0`},
 	} {
 		var n int
 		if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, c.table, c.name).Scan(&n); err != nil {
@@ -217,10 +283,11 @@ type Message struct {
 	Transcript       string `json:"transcript,omitempty"`
 	TranscriptStatus string `json:"transcript_status,omitempty"`
 	// Forwarded: the sender passed on someone else's message - its content
-	// is not the sender's own words. Pushed: already delivered straight into
-	// a conversation (claude/channel).
+	// is not the sender's own words.
 	Forwarded bool `json:"forwarded,omitempty"`
-	Pushed    bool `json:"pushed,omitempty"`
+	// FromOwner: sent by one of the owner numbers (config "owner"), so it is
+	// the user's own request. Filled in by the tools, not stored.
+	FromOwner bool `json:"from_owner,omitempty"`
 
 	// Addresses exactly as WhatsApp sent them (possibly LIDs); receipts and
 	// reply quotes must use these, not the rewritten phone-number form.
@@ -244,6 +311,9 @@ type NewMessage struct {
 	MediaRef                            []byte
 	RawChat, RawSender                  string
 	Forwarded                           bool
+	// TranscriptStatus "pending" for a voice note that will be transcribed,
+	// so that the waiting mode (--wait) knows its text is coming.
+	TranscriptStatus string
 }
 
 // SaveMessage stores a message and upserts its chat. A message that is
@@ -259,10 +329,11 @@ func (s *Store) SaveMessage(ctx context.Context, m NewMessage) (inserted bool, e
 	}
 	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO messages
 		(chat_jid, id, sender_jid, sender_phone, sender_name, from_me, ts, kind, text, quoted_id,
-		 media_mime, media_name, media_size, media_ref, raw_chat, raw_sender, forwarded, rev)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,`+nextRev+`)`,
+		 media_mime, media_name, media_size, media_ref, raw_chat, raw_sender, forwarded, transcript_status, rev)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,`+nextRev+`)`,
 		m.Chat, m.ID, m.SenderJID, m.SenderPhone, m.SenderName, b2i(m.FromMe), m.Time.Unix(),
-		m.Kind, m.Text, m.QuotedID, m.MediaMime, m.MediaName, m.MediaSize, m.MediaRef, m.RawChat, m.RawSender, b2i(m.Forwarded))
+		m.Kind, m.Text, m.QuotedID, m.MediaMime, m.MediaName, m.MediaSize, m.MediaRef, m.RawChat, m.RawSender, b2i(m.Forwarded),
+		m.TranscriptStatus)
 	if err != nil {
 		return false, err
 	}
@@ -341,7 +412,7 @@ func (s *Store) SetMediaPath(ctx context.Context, chat, id, path string) (bool, 
 
 const msgCols = `rev, chat_jid, id, sender_jid, sender_phone, sender_name, from_me, ts, kind, text,
 	quoted_id, media_mime, media_name, media_size, media_path, edited, deleted, media_ref, raw_chat, raw_sender,
-	transcript, transcript_status, forwarded, pushed`
+	transcript, transcript_status, forwarded`
 
 func (s *Store) scanMessages(rows *sql.Rows) ([]Message, error) {
 	ms, err := scanMessages(rows)
@@ -356,14 +427,14 @@ func scanMessages(rows *sql.Rows) ([]Message, error) {
 	var out []Message
 	for rows.Next() {
 		var m Message
-		var fromMe, edited, deleted, forwarded, pushed int
+		var fromMe, edited, deleted, forwarded int
 		var ts int64
 		if err := rows.Scan(&m.Rev, &m.Chat, &m.ID, &m.SenderJID, &m.SenderPhone, &m.SenderName, &fromMe,
 			&ts, &m.Kind, &m.Text, &m.QuotedID, &m.MediaMime, &m.MediaName, &m.MediaSize, &m.MediaPath,
-			&edited, &deleted, &m.mediaRef, &m.RawChat, &m.RawSender, &m.Transcript, &m.TranscriptStatus, &forwarded, &pushed); err != nil {
+			&edited, &deleted, &m.mediaRef, &m.RawChat, &m.RawSender, &m.Transcript, &m.TranscriptStatus, &forwarded); err != nil {
 			return nil, err
 		}
-		m.FromMe, m.Edited, m.Deleted, m.Forwarded, m.Pushed = fromMe == 1, edited == 1, deleted == 1, forwarded == 1, pushed == 1
+		m.FromMe, m.Edited, m.Deleted, m.Forwarded = fromMe == 1, edited == 1, deleted == 1, forwarded == 1
 		m.SenderPhone = plus(m.SenderPhone)
 		m.ts = time.Unix(ts, 0)
 		m.Time = m.ts.UTC().Format(time.RFC3339)
@@ -432,17 +503,6 @@ func (s *Store) Latest(ctx context.Context, limit int) ([]Message, error) {
 		return nil, err
 	}
 	return s.scanMessages(rows)
-}
-
-// MarkPushed records that a message was delivered into a conversation. It
-// reports false when it already was (so it is pushed only once).
-func (s *Store) MarkPushed(ctx context.Context, chat, id string) (bool, error) {
-	res, err := s.db.ExecContext(ctx, `UPDATE messages SET pushed = 1 WHERE chat_jid = ? AND id = ? AND pushed = 0`, chat, id)
-	if err != nil {
-		return false, err
-	}
-	n, _ := res.RowsAffected()
-	return n > 0, nil
 }
 
 // ExpiredMedia returns messages with a downloaded file older than before.

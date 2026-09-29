@@ -5,17 +5,16 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
-Z telefonu rovnou do konverzace: zprávy a hlasovky majitele jdou asistentovi hned, pokyny bere jen od něj.
+Z telefonu rovnou k asistentovi: server sám hlídá nové zprávy a asistenta probudí, až mu napíšeš. Pokyny bere jen od tebe.
 
-- Nová volba `owner` (čísla majitele): jen jeho zprávy jsou pro asistenta pokyny, zprávy ostatních a přeposlané zprávy jsou jen informace.
-- Příchozí zprávy jdou rovnou do konverzace přes Claude Code channel (zatím Claude Code v terminálu s `--dangerously-load-development-channels server:whatsapp`). Volba `channel.notify`: `owner` (výchozí), `all`, `off`. Hlasovka až s přepisem.
-- V aplikaci Claude hlídá nové zprávy opakovaná kontrola (návod B7).
-- Zprávy nesou `forwarded` a `pushed`.
+- Režim hlídání `--wait --cursor N`: asistent ho spustí na pozadí, server čte uložené zprávy a skončí, až přijde zpráva od majitele (hlasovka až s přepisem). Čekání nestojí žádné tokeny. Funguje v aplikaci Claude i v terminálu. Výpadek serveru nebo odhlášení hlásí, ticho tak neznamená výpadek.
+- Nová volba `owner` (čísla majitele): jen jeho zprávy jsou pro asistenta pokyny (`from_owner: true`), zprávy ostatních a přeposlané zprávy jsou jen informace. Volba `wake`: `owner` (výchozí) nebo `all`.
+- Zprávy nesou `forwarded`.
 
 ### Při aktualizaci
 
-- Se souhlasem uživatele doplň do configu `"owner": ["+420…"]` s jeho číslem (musí být v `read.chats`). Bez `owner` server do konverzace nic neposílá a žádná zpráva není pokyn.
-- Nastav hlídání nových zpráv podle návodu B7 (terminál: přepínač při spuštění, aplikace: hlídač). U hlídače nabídni interval, výchozí 15 minut, a omezení na pracovní dobu.
+- Se souhlasem uživatele doplň do configu `"owner": ["+420…"]` s jeho číslem (musí být v `read.chats`). Bez `owner` žádná zpráva není pokyn a hlídač se nespustí.
+- Spusť hlídače podle návodu B7 a přidej jeho spuštění do denního přehledu, hned po kroku „nové zprávy na WhatsAppu".
 
 ## [0.2.0] - 2026-09-29
 

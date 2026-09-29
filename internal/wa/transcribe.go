@@ -71,13 +71,10 @@ func (m *Manager) transcribe(ctx context.Context, j transcriptJob) {
 	if err != nil {
 		m.log.Warnf("transcription of %s: %v", j.id, err)
 		_ = m.st.SetTranscript(ctx, j.chat, j.id, "", "failed: "+err.Error())
-	} else if err := m.st.SetTranscript(ctx, j.chat, j.id, text, "done"); err != nil {
-		m.log.Warnf("saving transcript of %s: %v", j.id, err)
+		return
 	}
-	// Fresh voice notes waited for their transcript before going into the
-	// conversation; old ones from the backlog are not pushed.
-	if time.Since(msg.Timestamp()) < pushWindow {
-		m.push(ctx, j.chat, j.id)
+	if err := m.st.SetTranscript(ctx, j.chat, j.id, text, "done"); err != nil {
+		m.log.Warnf("saving transcript of %s: %v", j.id, err)
 	}
 }
 

@@ -65,8 +65,6 @@ type Manager struct {
 
 	jobs chan transcriptJob
 
-	notify func(method string, params map[string]any) // claude/channel
-
 	lock *flock.Flock
 
 	pairMu sync.Mutex // one wa_pair at a time
@@ -150,6 +148,7 @@ func (m *Manager) Status() Status {
 func (m *Manager) Start(ctx context.Context) {
 	if m.tryLock() {
 		go m.watchHandover(ctx)
+		go m.publishState(ctx)
 		go m.startSession(ctx)
 		return
 	}
@@ -177,6 +176,7 @@ func (m *Manager) Start(ctx context.Context) {
 			if m.tryLock() {
 				m.log.Infof("lock acquired, taking over the connection")
 				go m.watchHandover(ctx)
+				go m.publishState(ctx)
 				m.startSession(ctx)
 				return
 			}
@@ -304,6 +304,7 @@ func (m *Manager) Close() {
 		cli.Disconnect()
 	}
 	if holds {
+		m.writeState(context.Background(), stateStopped)
 		_ = os.Remove(m.lock.Path() + ".pid")
 		_ = m.lock.Unlock()
 	}

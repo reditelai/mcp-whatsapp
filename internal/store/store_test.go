@@ -130,3 +130,37 @@ func TestMediaFolderStays(t *testing.T) {
 		t.Fatalf("after rename: %q", f)
 	}
 }
+
+func TestServerStateAndReader(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "app.db")
+	if _, err := OpenReader(path); err == nil {
+		t.Fatal("reader opened a missing database")
+	}
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	r, err := OpenReader(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	if _, err := r.GetServerState(ctx); err != ErrNotFound {
+		t.Fatalf("empty: %v", err)
+	}
+	now := time.Now().Truncate(time.Second)
+	for _, st := range []string{"connecting", "connected"} {
+		if err := s.SetServerState(ctx, ServerState{State: st, Since: now, PID: 7, Version: "0.3.0", Updated: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := r.GetServerState(ctx)
+	if err != nil || got.State != "connected" || got.PID != 7 || !got.Updated.Equal(now) {
+		t.Fatalf("%v %+v", err, got)
+	}
+	if err := r.SetServerState(ctx, ServerState{State: "x"}); err == nil {
+		t.Fatal("reader could write")
+	}
+}

@@ -8,6 +8,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/mark3labs/mcp-go/server"
@@ -16,11 +18,14 @@ import (
 	"github.com/reditelai/mcp-whatsapp/internal/config"
 	"github.com/reditelai/mcp-whatsapp/internal/tools"
 	"github.com/reditelai/mcp-whatsapp/internal/wa"
+	"github.com/reditelai/mcp-whatsapp/internal/watch"
 )
 
 func main() {
 	cfgPath := flag.String("config", "", "cesta ke config.json (povinné)")
 	check := flag.Bool("check", false, "jen zkontroluje konfiguraci a skončí")
+	wait := flag.Bool("wait", false, "hlídání: počká na novou zprávu a skončí (spouští asistent na pozadí, SPEC.md, Hlídání)")
+	cursor := flag.String("cursor", "", "pro --wait: kurzor z posledního wa_new_messages")
 	showVersion := flag.Bool("version", false, "vypíše verzi")
 	flag.Parse()
 
@@ -38,8 +43,24 @@ func main() {
 		os.Exit(1)
 	}
 	if *check {
-		fmt.Fprintf(os.Stderr, "Konfigurace %s je v pořádku.\nData: %s\nPřepis hlasovek: %s\n", cfg.Path, cfg.DataDir, cfg.Transcription.Dir)
+		owner := "chybí (žádná zpráva není pokyn a hlídač nic neohlásí)"
+		if len(cfg.Owners) > 0 {
+			owner = "+" + strings.Join(cfg.Owners, ", +")
+		}
+		fmt.Fprintf(os.Stderr, "Konfigurace %s je v pořádku.\nData: %s\nPřepis hlasovek: %s\nMajitel (owner): %s\nHlídač budí: %s\n",
+			cfg.Path, cfg.DataDir, cfg.Transcription.Dir, owner, cfg.Wake)
 		return
+	}
+	if *wait {
+		c, err := strconv.ParseInt(*cursor, 10, 64)
+		if err != nil || c < 0 {
+			fmt.Println("chyba: --wait potřebuje --cursor, kurzor z posledního wa_new_messages")
+			os.Exit(watch.ExitUsage)
+		}
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		code := watch.Run(ctx, cfg, c, watch.Defaults, os.Stdout)
+		cancel()
+		os.Exit(code)
 	}
 
 	logger := wa.NewLogger(wa.ParseLevel(os.Getenv("MCP_WHATSAPP_LOG")))
@@ -58,12 +79,8 @@ func main() {
 	s := server.NewMCPServer("mcp-whatsapp", mcpwhatsapp.Version(),
 		server.WithToolCapabilities(false),
 		server.WithInstructions(tools.Instructions),
-		// Incoming messages straight into the conversation where the client
-		// supports it (Claude Code channels); ignored elsewhere.
-		server.WithExperimental(map[string]any{"claude/channel": map[string]any{}}),
 	)
 	tools.Register(s, m)
-	m.SetNotifier(s.SendNotificationToAllClients)
 	if err := server.ServeStdio(s, server.WithErrorLogger(log.New(os.Stderr, "mcp: ", log.LstdFlags))); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}

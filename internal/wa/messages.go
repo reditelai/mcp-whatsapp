@@ -136,6 +136,13 @@ func (m *Manager) onMessage(evt *events.Message, history bool) {
 		nm.ChatName = evt.Info.PushName
 	}
 	fillContent(&nm, msg)
+	// A fresh voice note that gets transcribed is stored as pending right
+	// away, so that the waiting mode (--wait) wakes the assistant only once
+	// its text is there.
+	transcribe := nm.Kind == "voice" && !history && m.stt.Ready() && len(nm.MediaRef) > 0 && nm.MediaSize <= autoDownloadLimit
+	if transcribe {
+		nm.TranscriptStatus = "pending"
+	}
 	if nm.Kind == "" {
 		// Key distribution and other protocol noise lands here, but so would
 		// a new message type: name it in the log, never drop it silently.
@@ -152,28 +159,20 @@ func (m *Manager) onMessage(evt *events.Message, history bool) {
 	if kind == policy.KindGroup && cli != nil {
 		m.fetchGroupName(cli, chat.jid)
 	}
-	if !inserted || history {
-		return
-	}
-	// A voice note goes into the conversation with its transcript, when
-	// transcription is installed; everything else right away.
-	waitForTranscript := nm.Kind == "voice" && m.stt.Ready()
-	if len(nm.MediaRef) > 0 && nm.MediaSize <= autoDownloadLimit {
+	if inserted && len(nm.MediaRef) > 0 && nm.MediaSize <= autoDownloadLimit && !history {
 		go func() {
 			if _, err := m.downloadMedia(context.Background(), chatKey, nm.ID); err != nil {
 				m.log.Warnf("media %s: %v", nm.ID, err)
-				m.push(context.Background(), chatKey, nm.ID)
+				if transcribe {
+					_ = m.st.SetTranscript(context.Background(), chatKey, nm.ID, "", "failed: download: "+err.Error())
+				}
 				return
 			}
-			if waitForTranscript {
+			if transcribe {
 				m.enqueueTranscript(chatKey, nm.ID)
-			} else {
-				m.push(context.Background(), chatKey, nm.ID)
 			}
 		}()
-		return
 	}
-	m.push(ctx, chatKey, nm.ID)
 }
 
 func kindName(k policy.Kind) string {

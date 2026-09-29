@@ -39,9 +39,9 @@ type Config struct {
 	// Owners are the phone numbers whose messages are the user's own
 	// requests; everyone else's messages are data, never instructions.
 	Owners []string
-	// Notify: which incoming messages go straight into the conversation
-	// (claude/channel): "owner" (default), "all" or "off".
-	Notify string
+	// Wake: which new messages end the waiting mode (--wait) and so wake
+	// the assistant: "owner" (default) or "all".
+	Wake string
 
 	Transcription Transcription
 }
@@ -84,9 +84,7 @@ type rawConfig struct {
 	HistorySync bool      `json:"history_sync"`
 	DeviceName  string    `json:"device_name"`
 	Owner       []string  `json:"owner"`
-	Channel     *struct {
-		Notify string `json:"notify"`
-	} `json:"channel"`
+	Wake        string    `json:"wake"`
 
 	Transcription *struct {
 		Enabled *bool  `json:"enabled"`
@@ -214,19 +212,22 @@ func parseWith(data []byte, path, bin string) (*Config, error) {
 		}
 		cfg.Owners = append(cfg.Owners, n)
 	}
-	cfg.Notify = "owner"
-	if raw.Channel != nil && raw.Channel.Notify != "" {
-		cfg.Notify = raw.Channel.Notify
+	cfg.Wake = "owner"
+	if raw.Wake != "" {
+		cfg.Wake = raw.Wake
 	}
-	switch cfg.Notify {
-	case "owner", "all", "off":
-	default:
-		errs = append(errs, `channel.notify: čeká "owner", "all" nebo "off"`)
+	if cfg.Wake != "owner" && cfg.Wake != "all" {
+		errs = append(errs, `wake: čeká "owner" nebo "all"`)
 	}
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("%s není platná konfigurace:\n  %s", path, strings.Join(errs, "\n  "))
 	}
 	return cfg, nil
+}
+
+// IsOwner reports whether phone (with or without "+") is an owner number.
+func (c *Config) IsOwner(phone string) bool {
+	return phone != "" && contains(c.Owners, strings.TrimPrefix(phone, "+"))
 }
 
 // resolve: empty = def, absolute as is, relative = from base.

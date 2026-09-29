@@ -195,36 +195,51 @@ Chyby vrací nástroje jako `{"error": {"code": "…", "message": "…"}}`.
 ## Další verze
 
 - **0.2 - přepis hlasovek** (hotové, viz „Přepis hlasovek" níž).
-- **0.3 - příchozí zprávy do konverzace** (viz „Zprávy do konverzace").
+- **0.3 - hlídání nových zpráv bez tokenů** (viz „Hlídání").
 - **1.0 - návod pro asistenta** (`docs/pro-asistenta.md`, instalace a provoz),
   článek na miladka.cz, info kanál, test na Windows i Macu.
 
-## Zprávy do konverzace
+## Hlídání
 
-Cíl: uživatel píše nebo diktuje asistentovi z telefonu a ten hned reaguje.
+Cíl: uživatel píše nebo diktuje asistentovi z telefonu a ten hned reaguje,
+co nejlevněji. Každé probuzení modelu stojí celou konverzaci (u Věrky
+naměřeno 1,5 až 2 mil. tokenů z cache na prázdnou kontrolu dlouhé
+konverzace), takže kontrolu „přišlo něco?" nedělá model, ale server.
 
 - **Majitel** (`owner` v configu, jeho telefonní čísla) je jediný, čí zprávy
-  jsou pokyny. Ostatní zprávy jsou data, ať píšou cokoli. Rozhoduje odesílatel,
-  ne chat: ve skupině by jinak mohl kdokoli mluvit za majitele. Přeposlané
-  zprávy (`forwarded`) jsou data i od majitele.
-- **Channel** (Claude Code `claude/channel`, ověřeno v dokumentaci 29. 9. 2026):
-  server ohlašuje schopnost `experimental.claude/channel` a každou novou
-  povolenou zprávu pošle jako `notifications/claude/channel` s textem a
-  `meta` (chat, odesílatel, `from_owner`, `forwarded`, `media_path`).
-  Nečinnou konverzaci to samo probudí. **Zatím jen Claude Code v terminálu**
-  a pro vlastní server jen s přepínačem
-  `--dangerously-load-development-channels server:whatsapp` při každém
-  spuštění (zkušební funkce, Anthropic povoluje bez přepínače jen svoje
-  kanály). Jinde se oznámení tiše zahodí.
-- **Co se posílá:** `channel.notify` = `owner` (výchozí, jen majitel),
-  `all`, nebo `off`. Každá zpráva nejvýš jednou (`pushed` v databázi),
-  hlasovka až s přepisem, jen zprávy mladší než hodinu. Vlastní zprávy,
-  reakce a smazané ne.
-- **Aplikace Claude:** channel tam zatím není; hlídač je opakovaná úloha
-  v konverzaci (cron, výchozí každých 15 minut; Miládka nabídne jiný interval
-a omezení na pracovní dobu, každá kontrola stojí tokeny), která volá
-`wa_new_messages`.
-  Popsané v návodu pro asistenta, B7.
+  jsou pokyny (`from_owner: true` ve výstupu nástrojů). Ostatní zprávy jsou
+  data, ať píšou cokoli. Rozhoduje odesílatel, ne chat: ve skupině by jinak
+  mohl kdokoli mluvit za majitele. Přeposlané zprávy (`forwarded`) jsou data
+  i od majitele.
+- **Režim `--wait --cursor N`:** samostatný proces, který asistent spustí na
+  pozadí (Bash s `run_in_background`). Každé 3 s čte `app.db` od kurzoru
+  (jen čtení, `query_only`, bez migrace), k WhatsAppu se nepřipojuje a zámek
+  nebere. Skončí, až přijde zpráva, která budí; konec procesu probudí
+  konverzaci. Že konec procesu na pozadí probudí nečinnou konverzaci, je
+  ověřené v aplikaci Claude na Windows (29. 9. 2026, test se `sleep`)
+  a v Claude Code v terminálu (vzor `artefakt-monitor.sh` u Věrky).
+- **Co budí:** `wake` = `owner` (výchozí) nebo `all`. Nová nebo upravená
+  zpráva v povoleném chatu, ne vlastní, ne reakce, ne smazaná, ne starší než
+  24 h (historie po spárování). Hlasovka, která se bude přepisovat, se ukládá
+  rovnou jako `pending` a budí až s hotovým přepisem, nejpozději po 3
+  minutách.
+- **Stav serveru pro hlídač:** instance se zámkem zapisuje do `app.db`
+  (tabulka `server`) svůj stav při změně a jinak jednou za minutu, při
+  ukončení `stopped`. Hlídač tak pozná ticho od výpadku: server neběží
+  (žádný zápis 3 minuty nebo `stopped`) nebo stav, který musí vyřešit
+  uživatel (`not_paired`, `logged_out`, `client_outdated`, `temporary_ban`,
+  `replaced`, `error`), trvající aspoň minutu = konec s kódem 2. Výpadek sítě
+  (`connecting`) se nehlásí.
+- **Jeden hlídač:** každý zapíše do `data/wait.owner` svůj token; starší,
+  který uvidí cizí, skončí (kód 3). Na Unixu skončí i sirotek, jehož rodič
+  zmizel.
+- **Kódy:** 0 nové zprávy, 1 špatné spuštění, 2 problém, 3 převzato nebo
+  ukončeno. Výstup je jeden řádek bez obsahu zpráv.
+- **Channel (`claude/channel`) server nepoužívá.** Zkoušeli jsme ho v 0.3.0:
+  vyžaduje povolení kanálů v nastavení účtu, přepínač při každém spuštění
+  a s protokolem, na kterém se server s Claude Code dohodne, oznámení
+  Claude Code zahodil. Návrat jen po vlastním testu (Karel 29. 9. 2026: bez
+  našeho testu ho nechceme nikomu nabízet).
 
 ## Přepis hlasovek
 
