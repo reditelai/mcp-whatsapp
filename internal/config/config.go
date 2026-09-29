@@ -40,8 +40,11 @@ type Config struct {
 	// requests; everyone else's messages are data, never instructions.
 	Owners []string
 	// Wake: which new messages end the waiting mode (--wait) and so wake
-	// the assistant: "owner" (default) or "all".
-	Wake string
+	// the assistant: "owner" (default), "all", or "list" - the owner plus
+	// WakeChats (senders, anywhere) and WakeGroups (any message there).
+	Wake       string
+	WakeChats  []string // phone numbers in E.164 without "+"
+	WakeGroups []string // group JIDs
 
 	Transcription Transcription
 }
@@ -76,15 +79,15 @@ type rawScope struct {
 }
 
 type rawConfig struct {
-	DataDir     string    `json:"data_dir"`
-	MediaDir    string    `json:"media_dir"`
-	MediaKeep   *int      `json:"media_keep_days"`
-	Read        *rawScope `json:"read"`
-	Send        *rawScope `json:"send"`
-	HistorySync bool      `json:"history_sync"`
-	DeviceName  string    `json:"device_name"`
-	Owner       []string  `json:"owner"`
-	Wake        string    `json:"wake"`
+	DataDir     string          `json:"data_dir"`
+	MediaDir    string          `json:"media_dir"`
+	MediaKeep   *int            `json:"media_keep_days"`
+	Read        *rawScope       `json:"read"`
+	Send        *rawScope       `json:"send"`
+	HistorySync bool            `json:"history_sync"`
+	DeviceName  string          `json:"device_name"`
+	Owner       []string        `json:"owner"`
+	Wake        json.RawMessage `json:"wake"`
 
 	Transcription *struct {
 		Enabled *bool  `json:"enabled"`
@@ -212,17 +215,81 @@ func parseWith(data []byte, path, bin string) (*Config, error) {
 		}
 		cfg.Owners = append(cfg.Owners, n)
 	}
-	cfg.Wake = "owner"
-	if raw.Wake != "" {
-		cfg.Wake = raw.Wake
-	}
-	if cfg.Wake != "owner" && cfg.Wake != "all" {
-		errs = append(errs, `wake: čeká "owner" nebo "all"`)
-	}
+	errs = parseWake(cfg, raw.Wake, errs)
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("%s není platná konfigurace:\n  %s", path, strings.Join(errs, "\n  "))
 	}
 	return cfg, nil
+}
+
+// parseWake: "owner" (default), "all", or a list of phone numbers and group
+// JIDs that wake on top of the owner. Listed chats must be readable, or
+// their messages would never be stored.
+func parseWake(cfg *Config, raw json.RawMessage, errs []string) []string {
+	cfg.Wake = "owner"
+	t := bytes.TrimSpace(raw)
+	if len(t) == 0 || string(t) == "null" {
+		return errs
+	}
+	var mode string
+	if json.Unmarshal(t, &mode) == nil {
+		if mode != "owner" && mode != "all" {
+			return append(errs, `wake: čeká "owner", "all" nebo seznam čísel a skupin`)
+		}
+		cfg.Wake = mode
+		return errs
+	}
+	var list []string
+	if err := json.Unmarshal(t, &list); err != nil {
+		return append(errs, `wake: čeká "owner", "all" nebo seznam čísel a skupin`)
+	}
+	cfg.Wake = "list"
+	for _, item := range list {
+		if g, err := normalizeGroup(item); err == nil {
+			if !cfg.Read.AllGroups && !contains(cfg.Read.Groups, g) {
+				errs = append(errs, fmt.Sprintf("wake obsahuje skupinu %s, která není v read.groups - server by její zprávy nečetl", g))
+			}
+			if !contains(cfg.WakeGroups, g) {
+				cfg.WakeGroups = append(cfg.WakeGroups, g)
+			}
+			continue
+		}
+		n, err := normalizePhone(item)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("wake: %q není telefonní číslo (+420…) ani JID skupiny (…@g.us)", item))
+			continue
+		}
+		if !contains(cfg.WakeChats, n) {
+			cfg.WakeChats = append(cfg.WakeChats, n)
+		}
+	}
+	return errs
+}
+
+// Wakes reports whether a new message from sender (phone, with or without
+// "+") in chat (JID) ends the waiting mode. The chat must be readable; the
+// caller checks that.
+func (c *Config) Wakes(sender, chat string) bool {
+	switch {
+	case c.Wake == "all" || c.IsOwner(sender):
+		return true
+	case c.Wake == "list":
+		return (sender != "" && contains(c.WakeChats, strings.TrimPrefix(sender, "+"))) || contains(c.WakeGroups, chat)
+	}
+	return false
+}
+
+// WakeSummary describes Wake for people: --check and wa_status.
+func (c *Config) WakeSummary() string {
+	if c.Wake != "list" {
+		return c.Wake
+	}
+	parts := []string{"owner"}
+	for _, p := range c.WakeChats {
+		parts = append(parts, "+"+p)
+	}
+	parts = append(parts, c.WakeGroups...)
+	return strings.Join(parts, ", ")
 }
 
 // IsOwner reports whether phone (with or without "+") is an owner number.

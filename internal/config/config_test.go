@@ -66,3 +66,36 @@ func TestOwner(t *testing.T) {
 		t.Fatal("bad wake accepted")
 	}
 }
+
+func TestWake(t *testing.T) {
+	c, err := Parse([]byte(`{"read":{"chats":"all","groups":["1203@g.us"]},"owner":["+420724000111"],"wake":["+420 600 000 000","1203@g.us"]}`), "x")
+	if err != nil || c.Wake != "list" || len(c.WakeChats) != 1 || len(c.WakeGroups) != 1 {
+		t.Fatalf("%v %+v", err, c)
+	}
+	for _, tc := range []struct {
+		sender, chat string
+		want         bool
+	}{
+		{"+420724000111", "420724000111@s.whatsapp.net", true}, // owner
+		{"+420600000000", "420600000000@s.whatsapp.net", true}, // listed person
+		{"+420600000000", "9999@g.us", true},                   // listed person in another group
+		{"+420555000000", "1203@g.us", true},                   // anyone in a listed group
+		{"+420555000000", "420555000000@s.whatsapp.net", false},
+	} {
+		if got := c.Wakes(tc.sender, tc.chat); got != tc.want {
+			t.Errorf("Wakes(%s, %s) = %v", tc.sender, tc.chat, got)
+		}
+	}
+	if s := c.WakeSummary(); s != "owner, +420600000000, 1203@g.us" {
+		t.Fatalf("summary %q", s)
+	}
+	if _, err := Parse([]byte(`{"read":{"chats":"all"},"wake":["1203@g.us"]}`), "x"); err == nil {
+		t.Fatal("unreadable wake group accepted")
+	}
+	if _, err := Parse([]byte(`{"read":{"chats":"all"},"wake":["kolega"]}`), "x"); err == nil {
+		t.Fatal("bad wake item accepted")
+	}
+	if c, _ := Parse([]byte(`{"read":{"chats":"all"},"wake":"all"}`), "x"); c.Wake != "all" || !c.Wakes("+420555000000", "x") {
+		t.Fatal("all")
+	}
+}

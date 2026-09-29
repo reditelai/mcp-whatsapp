@@ -5,10 +5,12 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [0.3.0] - 2026-09-30
+
 Z telefonu rovnou k asistentovi: server sám hlídá nové zprávy a asistenta probudí, až mu napíšeš. Pokyny bere jen od tebe.
 
-- Režim hlídání `--wait --cursor N`: asistent ho spustí na pozadí, server čte uložené zprávy a skončí, až přijde zpráva od majitele (hlasovka až s přepisem). Čekání nestojí žádné tokeny. Funguje v aplikaci Claude i v terminálu. Výpadek serveru nebo odhlášení hlásí, ticho tak neznamená výpadek.
-- Nová volba `owner` (čísla majitele): jen jeho zprávy jsou pro asistenta pokyny (`from_owner: true`), zprávy ostatních a přeposlané zprávy jsou jen informace. Volba `wake`: `owner` (výchozí) nebo `all`.
+- Režim hlídání `--wait --cursor N`: asistent ho spustí na pozadí, server čte uložené zprávy a skončí, až přijde zpráva od majitele (hlasovka až s přepisem). Čekání nestojí žádné tokeny. Funguje v aplikaci Claude i v terminálu. Výpadek serveru nebo odhlášení hlásí, ticho tak neznamená výpadek. Před stropem procesů na pozadí (2 hodiny) skončí sám a řekne si o nové spuštění.
+- Nová volba `owner` (čísla majitele): jen jeho zprávy jsou pro asistenta pokyny (`from_owner: true`), zprávy ostatních a přeposlané zprávy jsou jen informace. Volba `wake`: `owner` (výchozí), seznam dalších lidí a skupin, které budí spolu s majitelem, nebo `all`.
 - Zprávy nesou `forwarded`.
 
 ### Při aktualizaci

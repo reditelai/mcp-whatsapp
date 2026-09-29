@@ -99,7 +99,7 @@ func TestOthersDoNotWakeInOwnerMode(t *testing.T) {
 	wait := e.run(e.cursor(), 300*time.Millisecond)
 	e.save("other", "420600000000", "text", false, "")
 	e.save("mine", owner, "text", true, "")
-	if code, out := wait(); code != ExitReplaced {
+	if code, out := wait(); code != ExitRestart {
 		t.Fatalf("woke: %d %q", code, out)
 	}
 }
@@ -148,7 +148,7 @@ func TestDeletedDoesNotWake(t *testing.T) {
 	if _, _, err := e.st.DeleteMessage(context.Background(), owner+"@s.whatsapp.net", "d"); err != nil {
 		t.Fatal(err)
 	}
-	if code, out := e.run(c, 300*time.Millisecond)(); code != ExitReplaced {
+	if code, out := e.run(c, 300*time.Millisecond)(); code != ExitRestart {
 		t.Fatalf("woke: %d %q", code, out)
 	}
 }
@@ -166,7 +166,7 @@ func TestProblemStates(t *testing.T) {
 	}
 	// A short outage is not reported.
 	e.state("connecting")
-	if code, out := e.run(e.cursor(), 300*time.Millisecond)(); code != ExitReplaced {
+	if code, out := e.run(e.cursor(), 300*time.Millisecond)(); code != ExitRestart {
 		t.Fatalf("connecting reported: %d %q", code, out)
 	}
 }
@@ -204,5 +204,31 @@ func TestBadStart(t *testing.T) {
 	var out bytes.Buffer
 	if code := Run(context.Background(), &cfg, 0, fast, &out); code != ExitUsage || !strings.Contains(out.String(), "owner") {
 		t.Fatalf("no owner: %d %q", code, out.String())
+	}
+}
+
+func TestMaxRun(t *testing.T) {
+	e := newEnv(t, "")
+	o := fast
+	o.MaxRun = 200 * time.Millisecond
+	code, out := e.runWith(o, e.cursor(), 5*time.Second)()
+	if code != ExitRestart || !strings.Contains(out, "vypršel") || !strings.Contains(out, "stejným kurzorem") {
+		t.Fatalf("%d %q", code, out)
+	}
+	code, out = e.run(e.cursor(), 100*time.Millisecond)() // stopped from outside
+	if code != ExitRestart || !strings.Contains(out, "zvenku") {
+		t.Fatalf("stop: %d %q", code, out)
+	}
+}
+
+func TestWakeList(t *testing.T) {
+	e := newEnv(t, `,"wake":["+420600000000"]`)
+	c := e.cursor()
+	wait := e.run(c, 2*time.Second)
+	e.save("x", "420555000000", "text", false, "") // not listed
+	time.Sleep(50 * time.Millisecond)
+	e.save("y", "420600000000", "text", false, "") // listed colleague
+	if code, out := wait(); code != ExitMessages || !strings.Contains(out, "nové zprávy: 1, z toho od majitele 0") {
+		t.Fatalf("%d %q", code, out)
 	}
 }

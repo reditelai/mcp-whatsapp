@@ -26,12 +26,15 @@ import (
 	appstore "github.com/reditelai/mcp-whatsapp/internal/store"
 )
 
-// Exit codes; docs/pro-asistenta.md B7 says what the assistant does with each.
+// Exit codes; docs/pro-asistenta.md B7 says what the assistant does with
+// each. 1 and 2 are left out: Go and the shell use them for crashes and bad
+// flags, and those mean "start again" like any unknown end.
 const (
 	ExitMessages = 0 // messages to handle: call wa_new_messages
-	ExitUsage    = 1 // wrong start (config, cursor, database); the line says what
-	ExitProblem  = 2 // the server is gone or WhatsApp needs the user; do not restart before it is fixed
-	ExitReplaced = 3 // a newer watcher took over, or it was stopped; nothing to do
+	ExitReplaced = 3 // a newer watcher took over, or the one who started it is gone; nothing to do
+	ExitRestart  = 4 // time is up or it was stopped from outside; start it again with the same cursor
+	ExitProblem  = 5 // the server is gone or WhatsApp needs the user; do not restart before it is fixed
+	ExitUsage    = 6 // wrong start (config, cursor, database); the line says what
 )
 
 // Options are the timings; Defaults in production, short ones in tests.
@@ -41,6 +44,10 @@ type Options struct {
 	StaleAfter   time.Duration // a server state older than this = the server is not running
 	ProblemAfter time.Duration // a problem must last this long before it is reported
 	MaxAge       time.Duration // older messages (history sync) do not wake
+	// MaxRun ends the watcher before Claude Code stops its background
+	// process (at most 2 hours), so that the end says "start again" instead
+	// of looking like a stop.
+	MaxRun time.Duration
 }
 
 // Defaults: reading app.db every 3 s costs nothing noticeable.
@@ -50,6 +57,7 @@ var Defaults = Options{
 	StaleAfter:   3 * time.Minute,
 	ProblemAfter: time.Minute,
 	MaxAge:       24 * time.Hour,
+	MaxRun:       115 * time.Minute,
 }
 
 // problemStates need the user; the others (starting, connecting, pairing,
@@ -104,6 +112,8 @@ func Run(ctx context.Context, cfg *config.Config, cursor int64, o Options, out i
 		}
 	}()
 	ppid := os.Getppid()
+	again := "Spusť hlídače znovu se stejným kurzorem " + strconv.FormatInt(cursor, 10) + "."
+	started := time.Now()
 
 	t := time.NewTicker(o.Poll)
 	defer t.Stop()
@@ -122,11 +132,11 @@ func Run(ctx context.Context, cfg *config.Config, cursor int64, o Options, out i
 		now := time.Now()
 		n, owner, untranscribed, err := w.scan(ctx, now)
 		if ctx.Err() != nil {
-			return say(ExitReplaced, "konec: hlídač byl ukončen")
+			return say(ExitRestart, "konec: hlídač byl zastaven zvenku. %s", again)
 		}
 		if err == nil && n > 0 {
 			line := fmt.Sprintf("nové zprávy: %d", n)
-			if cfg.Wake == "all" {
+			if cfg.Wake != "owner" {
 				line += fmt.Sprintf(", z toho od majitele %d", owner)
 			}
 			if untranscribed > 0 {
@@ -144,7 +154,7 @@ func Run(ctx context.Context, cfg *config.Config, cursor int64, o Options, out i
 			p = w.problem(ctx, now)
 		}
 		if ctx.Err() != nil {
-			return say(ExitReplaced, "konec: hlídač byl ukončen")
+			return say(ExitRestart, "konec: hlídač byl zastaven zvenku. %s", again)
 		}
 		if p == "" {
 			problemSince = time.Time{}
@@ -154,9 +164,13 @@ func Run(ctx context.Context, cfg *config.Config, cursor int64, o Options, out i
 			return say(ExitProblem, "problém: %s", p)
 		}
 
+		if o.MaxRun > 0 && time.Since(started) >= o.MaxRun {
+			return say(ExitRestart, "konec: vypršel čas hlídání. %s", again)
+		}
+
 		select {
 		case <-ctx.Done():
-			return say(ExitReplaced, "konec: hlídač byl ukončen")
+			return say(ExitRestart, "konec: hlídač byl zastaven zvenku. %s", again)
 		case <-t.C:
 		}
 	}
@@ -207,9 +221,9 @@ func (w *watcher) scan(ctx context.Context, now time.Time) (n, owner, untranscri
 	return n, owner, untranscribed, nil
 }
 
-// wakes: someone else's new or edited message in a readable chat, from the
-// owner unless wake is "all". Own messages (including what the assistant
-// sent), deletions and reactions never wake.
+// wakes: someone else's new or edited message in a readable chat that the
+// config's wake allows (config.Wakes). Own messages (including what the
+// assistant sent), deletions and reactions never wake.
 func (w *watcher) wakes(m *appstore.Message, now time.Time) bool {
 	if m.FromMe || m.Deleted || m.Kind == "reaction" {
 		return false
@@ -221,7 +235,7 @@ func (w *watcher) wakes(m *appstore.Message, now time.Time) bool {
 	if err != nil || !w.pol.CanRead(jid, "") {
 		return false
 	}
-	return w.cfg.Wake == "all" || w.cfg.IsOwner(m.SenderPhone)
+	return w.cfg.Wakes(m.SenderPhone, m.Chat)
 }
 
 // problem describes what keeps messages from coming, or "".

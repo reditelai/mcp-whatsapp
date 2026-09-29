@@ -195,7 +195,7 @@ Chyby vrací nástroje jako `{"error": {"code": "…", "message": "…"}}`.
 ## Další verze
 
 - **0.2 - přepis hlasovek** (hotové, viz „Přepis hlasovek" níž).
-- **0.3 - hlídání nových zpráv bez tokenů** (viz „Hlídání").
+- **0.3 - hlídání nových zpráv bez tokenů** (hotové, viz „Hlídání").
 - **1.0 - návod pro asistenta** (`docs/pro-asistenta.md`, instalace a provoz),
   článek na miladka.cz, info kanál, test na Windows i Macu.
 
@@ -216,9 +216,20 @@ konverzace), takže kontrolu „přišlo něco?" nedělá model, ale server.
   (jen čtení, `query_only`, bez migrace), k WhatsAppu se nepřipojuje a zámek
   nebere. Skončí, až přijde zpráva, která budí; konec procesu probudí
   konverzaci. Že konec procesu na pozadí probudí nečinnou konverzaci, je
-  ověřené v aplikaci Claude na Windows (29. 9. 2026, test se `sleep`)
-  a v Claude Code v terminálu (vzor `artefakt-monitor.sh` u Věrky).
-- **Co budí:** `wake` = `owner` (výchozí) nebo `all`. Nová nebo upravená
+  ověřené v aplikaci Claude na Windows (29. 9. 2026, test se `sleep` na
+  2 i 40 minut) a v Claude Code v terminálu (Věrka, 0.3.0-rc2: text,
+  hlasovka, 45 minut čekání bez jediného dotazu na model).
+- **Strop procesu na pozadí:** Claude Code ho bez `timeout` zastaví po 30
+  minutách, s `timeout: 7200000` po 2 hodinách (Věrka 29. 9. 2026). Hlídač
+  proto sám skončí po 115 minutách (`--max`) s kódem 4 a asistent ho spustí
+  znovu. Znovuspuštění stojí 2 dotazy na model, jednou za necelé 2 hodiny.
+- **Cena probuzení:** nejméně 3 dotazy na model (`wa_new_messages`, odpověď
+  + kurzor + nový hlídač najednou, závěrečný text), tedy asi 3× velikost
+  konverzace. Oznámení o konci procesu nese jen kód a cestu k výstupu, takže
+  vypsat zprávy rovnou z hlídače by dotaz neušetřilo.
+- **Co budí:** `wake` = `owner` (výchozí), seznam čísel a skupin (budí
+  spolu s majitelem: lidé kdekoli, skupiny celé; Karel 29. 9. 2026: „ma byt
+  moznost owner, konkretni lidi nebo vsichni"), nebo `all`. Nová nebo upravená
   zpráva v povoleném chatu, ne vlastní, ne reakce, ne smazaná, ne starší než
   24 h (historie po spárování). Hlasovka, která se bude přepisovat, se ukládá
   rovnou jako `pending` a budí až s hotovým přepisem, nejpozději po 3
@@ -233,8 +244,10 @@ konverzace), takže kontrolu „přišlo něco?" nedělá model, ale server.
 - **Jeden hlídač:** každý zapíše do `data/wait.owner` svůj token; starší,
   který uvidí cizí, skončí (kód 3). Na Unixu skončí i sirotek, jehož rodič
   zmizel.
-- **Kódy:** 0 nové zprávy, 1 špatné spuštění, 2 problém, 3 převzato nebo
-  ukončeno. Výstup je jeden řádek bez obsahu zpráv.
+- **Kódy:** 0 nové zprávy, 3 převzal jiný hlídač, 4 spusť znovu (vypršel
+  čas, zastaveno zvenku), 5 problém pro uživatele, 6 špatné spuštění. 1 a 2
+  vynechané, ty používá Go a shell při pádu a chybných přepínačích; každý
+  neznámý konec znamená spustit znovu. Výstup je jeden řádek bez obsahu zpráv.
 - **Channel (`claude/channel`) server nepoužívá.** Zkoušeli jsme ho v 0.3.0:
   vyžaduje povolení kanálů v nastavení účtu, přepínač při každém spuštění
   a s protokolem, na kterém se server s Claude Code dohodne, oznámení

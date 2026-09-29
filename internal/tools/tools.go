@@ -201,7 +201,7 @@ func (h *handlers) status(ctx context.Context, _ mcp.CallToolRequest) (*mcp.Call
 		"send":            scopeSummary(cfg.Send.AllChats, cfg.Send.Chats, cfg.Send.AllGroups, cfg.Send.Groups),
 		"send_file_dirs":  append([]string{}, cfg.Send.FileDirs...),
 		"owner":           plusAll(cfg.Owners),
-		"wake":            cfg.Wake,
+		"wake":            cfg.WakeSummary(),
 		"stored_chats":    chats,
 		"stored_messages": msgs,
 		"config":          cfg.Path,

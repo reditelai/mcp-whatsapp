@@ -26,6 +26,7 @@ func main() {
 	check := flag.Bool("check", false, "jen zkontroluje konfiguraci a skončí")
 	wait := flag.Bool("wait", false, "hlídání: počká na novou zprávu a skončí (spouští asistent na pozadí, SPEC.md, Hlídání)")
 	cursor := flag.String("cursor", "", "pro --wait: kurzor z posledního wa_new_messages")
+	maxRun := flag.Duration("max", watch.Defaults.MaxRun, "pro --wait: nejdelší hlídání, pak konec s kódem 4 (spusť znovu)")
 	showVersion := flag.Bool("version", false, "vypíše verzi")
 	flag.Parse()
 
@@ -48,7 +49,7 @@ func main() {
 			owner = "+" + strings.Join(cfg.Owners, ", +")
 		}
 		fmt.Fprintf(os.Stderr, "Konfigurace %s je v pořádku.\nData: %s\nPřepis hlasovek: %s\nMajitel (owner): %s\nHlídač budí: %s\n",
-			cfg.Path, cfg.DataDir, cfg.Transcription.Dir, owner, cfg.Wake)
+			cfg.Path, cfg.DataDir, cfg.Transcription.Dir, owner, cfg.WakeSummary())
 		return
 	}
 	if *wait {
@@ -58,7 +59,9 @@ func main() {
 			os.Exit(watch.ExitUsage)
 		}
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		code := watch.Run(ctx, cfg, c, watch.Defaults, os.Stdout)
+		o := watch.Defaults
+		o.MaxRun = *maxRun
+		code := watch.Run(ctx, cfg, c, o, os.Stdout)
 		cancel()
 		os.Exit(code)
 	}

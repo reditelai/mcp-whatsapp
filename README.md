@@ -79,7 +79,7 @@ S Miládkou to všechno udělá asistent podle `docs/pro-asistenta.md`.
 | `transcription.enabled` | přepis hlasovek; výchozí `true`, platí až po instalaci (`wa_transcription_setup`) |
 | `transcription.threads`, `transcription.batch` | vlákna a počet úseků najednou; výchozí 2 a 2 (asi 1,3 GB paměti). Na slabém stroji `batch: 1` |
 | `owner` | tvoje čísla (`+420…`): jen jejich zprávy jsou pro asistenta pokyny; musí být v `read.chats` |
-| `wake` | které nové zprávy asistenta probudí (režim `--wait`): `"owner"` (výchozí), nebo `"all"` |
+| `wake` | které nové zprávy asistenta probudí (režim `--wait`): `"owner"` (výchozí), seznam dalších čísel a skupin (budí spolu s tebou), nebo `"all"` |
 | `media_dir` | kam se ukládají fotky, hlasovky a dokumenty; výchozí `data/media`, s Miládkou `vstupy/whatsapp` |
 | `media_keep_days` | po kolika dnech se stažená média smažou (text a přepis zůstanou); výchozí 30, `0` = nikdy |
 | `data_dir` | kde leží data serveru; výchozí `data/` vedle binárky |
