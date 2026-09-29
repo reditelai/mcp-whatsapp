@@ -15,7 +15,7 @@ Z telefonu rovnou do konverzace: zprávy a hlasovky majitele jdou asistentovi hn
 ### Při aktualizaci
 
 - Se souhlasem uživatele doplň do configu `"owner": ["+420…"]` s jeho číslem (musí být v `read.chats`). Bez `owner` server do konverzace nic neposílá a žádná zpráva není pokyn.
-- Nastav hlídání nových zpráv podle návodu B7 (terminál: přepínač při spuštění, aplikace: hlídač).
+- Nastav hlídání nových zpráv podle návodu B7 (terminál: přepínač při spuštění, aplikace: hlídač). U hlídače nabídni interval, výchozí 15 minut, a omezení na pracovní dobu.
 
 ## [0.2.0] - 2026-09-29
 

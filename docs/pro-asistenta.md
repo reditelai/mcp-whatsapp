@@ -276,17 +276,18 @@ uživatele zeptej, **jak často a kdy má hlídač kontrolovat**, a řekni mu, c
 to stojí: každá kontrola je krátká odpověď a stojí trochu tokenů, i když nic
 nepřišlo.
 
-| Nabídni | `cron` | Reakce | Kontrol za den |
+| Nabídni | `cron` | Reakce | Kontrol za 24 h |
 |---|---|---|---|
-| každých 15 minut (výchozí) | `*/15 * * * *` | do 15 minut | kolem 50 za pracovní den |
-| každých 30 minut | `*/30 * * * *` | do půl hodiny | kolem 25 |
-| každou hodinu | `0 * * * *` | do hodiny | kolem 12 |
-| každých 5 minut | `*/5 * * * *` | skoro hned | kolem 150, znatelně víc tokenů |
+| každých 15 minut (výchozí) | `*/15 * * * *` | do 15 minut | 96 |
+| každých 30 minut | `*/30 * * * *` | do půl hodiny | 48 |
+| každou hodinu | `0 * * * *` | do hodiny | 24 |
+| každých 5 minut | `*/5 * * * *` | skoro hned | 288, znatelně víc tokenů |
 
 K tomu nabídni **jen v pracovní době**, třeba 7 až 20 h: `*/15 7-20 * * *`
-(v noci kontrola nemá smysl, když nikdo nepíše). Co zvolí, zapiš do
-`.miladka/stav.md` k modulu WhatsApp, ať to víš i příště. Změnit to může
-kdykoli: „kontroluj WhatsApp každou hodinu" = smaž úlohu a založ ji znovu.
+(kontrol zhruba o polovinu míň, v noci stejně nikdo nepíše). Co zvolí,
+zapiš do `system/whatsapp-kotva.md` jako `Hlídač: */15 7-20 * * *`, ať to
+víš i při obnově. Změnit to může kdykoli („kontroluj WhatsApp každou
+hodinu"): smaž úlohu (`CronDelete`), založ novou a přepiš řádek v kotvě.
 
 Pak založ v konverzaci opakovanou úlohu (`CronCreate`, stejně jako denní
 přehled):
@@ -299,7 +300,7 @@ přehled):
 
 Úloha žije jen v otevřené konverzaci a po 7 dnech vyprší. **Obnov ji v denním
 přehledu** (krok „nové zprávy na WhatsAppu": `CronList`, chybí-li nebo je
-starší 6 dní, založ znovu). Když je aplikace zavřená, zprávy počkají
+starší 6 dní, založ znovu s intervalem z řádku `Hlídač:` v kotvě). Když je aplikace zavřená, zprávy počkají
 v telefonu a projdeš je při dalším spuštění.
 
 **Jak s příchozí zprávou zacházet (obě cesty):**
