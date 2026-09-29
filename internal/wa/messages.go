@@ -155,6 +155,10 @@ func (m *Manager) onMessage(evt *events.Message, history bool) {
 		go func() {
 			if _, err := m.downloadMedia(context.Background(), chatKey, nm.ID); err != nil {
 				m.log.Warnf("media %s: %v", nm.ID, err)
+				return
+			}
+			if nm.Kind == "voice" {
+				m.enqueueTranscript(chatKey, nm.ID)
 			}
 		}()
 	}

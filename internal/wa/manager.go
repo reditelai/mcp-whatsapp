@@ -23,6 +23,7 @@ import (
 	"github.com/reditelai/mcp-whatsapp/internal/config"
 	"github.com/reditelai/mcp-whatsapp/internal/policy"
 	appstore "github.com/reditelai/mcp-whatsapp/internal/store"
+	"github.com/reditelai/mcp-whatsapp/internal/stt"
 )
 
 // State of the connection, as reported by wa_status. See SPEC.md, Stav.
@@ -60,6 +61,9 @@ type Manager struct {
 	log waLog.Logger
 	pol *policy.Policy
 	st  *appstore.Store
+	stt *stt.Engine
+
+	jobs chan transcriptJob
 
 	lock *flock.Flock
 
@@ -92,6 +96,8 @@ func NewManager(cfg *config.Config, log waLog.Logger) (*Manager, error) {
 		log:        log,
 		pol:        policy.New(cfg),
 		st:         st,
+		stt:        stt.New(cfg.DataDir, cfg.Transcription.Enabled, cfg.Transcription.Threads, cfg.Transcription.Batch, log.Sub("stt")),
+		jobs:       make(chan transcriptJob, 256),
 		lock:       flock.New(filepath.Join(cfg.DataDir, "lock")),
 		state:      StateStarting,
 		since:      time.Now(),
@@ -214,6 +220,7 @@ func (m *Manager) startSession(ctx context.Context) {
 		return
 	}
 	m.newClient(device)
+	m.startTranscriber(ctx)
 	m.mu.Lock()
 	paired := m.cli.Store.ID != nil
 	m.mu.Unlock()
@@ -304,6 +311,7 @@ var (
 	ErrLocked      = errors.New("locked_by_other_instance")
 	ErrNotReady    = errors.New("not_connected")
 	ErrAlreadyPair = errors.New("already_paired")
+	ErrNotVoice    = errors.New("not_voice")
 )
 
 // client returns the client if this instance owns the connection.

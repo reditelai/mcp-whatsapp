@@ -25,6 +25,8 @@ Doporučujeme proto pro asistenta samostatné číslo, ne tvoje hlavní.
   si nastavení sám nepřepíše.
 - **Nové zprávy od kurzoru**, hledání v uložených zprávách, fotky, soubory
   a hlasovky ke stažení.
+- **Přepis hlasovek na text přímo v počítači.** Nic neodchází ven. Model se
+  stáhne jednou (asi 510 MB), až k tomu dáš souhlas.
 - **Čitelný stav:** zastaralý klient, odhlášení z telefonu, výpadek sítě
   nebo spojení v jiné konverzaci jsou vidět jako různé stavy.
 - **Samo se udržuje:** knihovna whatsmeow se jednou týdně aktualizuje a
@@ -68,6 +70,8 @@ S Miládkou to všechno udělá asistent podle `docs/pro-asistenta.md`.
 | `send.files` | celé cesty ke složkám, ze kterých smí posílat soubory; prázdné = soubory ne |
 | `history_sync` | po spárování uložit historii povolených chatů (výchozí ne) |
 | `device_name` | jméno zařízení v telefonu v Propojených zařízeních |
+| `transcription.enabled` | přepis hlasovek; výchozí `true`, platí až po instalaci (`wa_transcription_setup`) |
+| `transcription.threads`, `transcription.batch` | vlákna a počet úseků najednou; výchozí 2 a 2 (asi 1,3 GB paměti). Na slabém stroji `batch: 1` |
 | `data_dir` | kde leží data serveru, výchozí `~/.mcp-whatsapp` |
 
 **Prázdný seznam i chybějící klíč znamená nikam**, ne kamkoli.
@@ -80,4 +84,7 @@ soubor, má přístup k tvému WhatsAppu.** Nepatří do gitu ani do zálohy.
 Apache-2.0, viz [`LICENSE`](LICENSE). Server vychází z částí
 [wadb](https://github.com/sausheong/wadb) (MIT, upozornění v
 [`NOTICE`](NOTICE)). Knihovna [whatsmeow](https://github.com/tulir/whatsmeow)
-je závislost pod MPL-2.0, její zdrojový kód je na GitHubu autora.
+je závislost pod MPL-2.0, její zdrojový kód je na GitHubu autora. Přepis
+hlasovek stahuje na požádání [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
+(Apache-2.0) a model NVIDIA Parakeet TDT 0.6B v3 (CC BY 4.0); podrobnosti
+v `NOTICE`.

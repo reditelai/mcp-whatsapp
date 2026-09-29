@@ -80,6 +80,8 @@ CREATE TABLE IF NOT EXISTS messages (
 	raw_chat     TEXT NOT NULL DEFAULT '',
 	raw_sender   TEXT NOT NULL DEFAULT '',
 	rev          INTEGER NOT NULL DEFAULT 0,
+	transcript   TEXT NOT NULL DEFAULT '',
+	transcript_status TEXT NOT NULL DEFAULT '',
 	UNIQUE (chat_jid, id)
 );
 CREATE INDEX IF NOT EXISTS messages_chat_ts ON messages (chat_jid, ts);
@@ -99,14 +101,20 @@ func (s *Store) migrate() error {
 	if _, err := s.db.Exec(schema); err != nil {
 		return err
 	}
-	// rev came after the first test installs: add it and number existing rows.
-	var n int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name = 'rev'`).Scan(&n); err != nil {
-		return err
-	}
-	if n == 0 {
-		if _, err := s.db.Exec(`ALTER TABLE messages ADD COLUMN rev INTEGER NOT NULL DEFAULT 0; UPDATE messages SET rev = seq`); err != nil {
+	// Columns added after the first installs (0.1.0).
+	for _, c := range []struct{ name, ddl string }{
+		{"rev", `ALTER TABLE messages ADD COLUMN rev INTEGER NOT NULL DEFAULT 0; UPDATE messages SET rev = seq`},
+		{"transcript", `ALTER TABLE messages ADD COLUMN transcript TEXT NOT NULL DEFAULT ''`},
+		{"transcript_status", `ALTER TABLE messages ADD COLUMN transcript_status TEXT NOT NULL DEFAULT ''`},
+	} {
+		var n int
+		if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name = ?`, c.name).Scan(&n); err != nil {
 			return err
+		}
+		if n == 0 {
+			if _, err := s.db.Exec(c.ddl); err != nil {
+				return err
+			}
 		}
 	}
 	_, err := s.db.Exec(`CREATE INDEX IF NOT EXISTS messages_rev ON messages (rev)`)
@@ -147,6 +155,10 @@ type Message struct {
 	MediaPath   string `json:"media_path,omitempty"`
 	Edited      bool   `json:"edited,omitempty"`
 	Deleted     bool   `json:"deleted,omitempty"`
+	// Voice notes: machine transcript and its state ("pending", "done",
+	// "failed: …", "" when transcription is not installed).
+	Transcript       string `json:"transcript,omitempty"`
+	TranscriptStatus string `json:"transcript_status,omitempty"`
 
 	// Addresses exactly as WhatsApp sent them (possibly LIDs); receipts and
 	// reply quotes must use these, not the rewritten phone-number form.
@@ -249,7 +261,8 @@ func (s *Store) SetMediaPath(ctx context.Context, chat, id, path string) (bool, 
 }
 
 const msgCols = `rev, chat_jid, id, sender_jid, sender_phone, sender_name, from_me, ts, kind, text,
-	quoted_id, media_mime, media_name, media_size, media_path, edited, deleted, media_ref, raw_chat, raw_sender`
+	quoted_id, media_mime, media_name, media_size, media_path, edited, deleted, media_ref, raw_chat, raw_sender,
+	transcript, transcript_status`
 
 func scanMessages(rows *sql.Rows) ([]Message, error) {
 	defer rows.Close()
@@ -260,7 +273,7 @@ func scanMessages(rows *sql.Rows) ([]Message, error) {
 		var ts int64
 		if err := rows.Scan(&m.Rev, &m.Chat, &m.ID, &m.SenderJID, &m.SenderPhone, &m.SenderName, &fromMe,
 			&ts, &m.Kind, &m.Text, &m.QuotedID, &m.MediaMime, &m.MediaName, &m.MediaSize, &m.MediaPath,
-			&edited, &deleted, &m.mediaRef, &m.RawChat, &m.RawSender); err != nil {
+			&edited, &deleted, &m.mediaRef, &m.RawChat, &m.RawSender, &m.Transcript, &m.TranscriptStatus); err != nil {
 			return nil, err
 		}
 		m.FromMe, m.Edited, m.Deleted = fromMe == 1, edited == 1, deleted == 1
@@ -328,6 +341,29 @@ func (s *Store) After(ctx context.Context, cursor int64, limit int) ([]Message, 
 // Latest returns the newest limit messages, oldest first.
 func (s *Store) Latest(ctx context.Context, limit int) ([]Message, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT * FROM (SELECT `+msgCols+` FROM messages ORDER BY rev DESC LIMIT ?) ORDER BY rev`, limit)
+	if err != nil {
+		return nil, err
+	}
+	return scanMessages(rows)
+}
+
+// SetTranscript stores a voice note transcript (or its state). A finished
+// transcript is a change: the message comes again in wa_new_messages.
+func (s *Store) SetTranscript(ctx context.Context, chat, id, text, status string) error {
+	bump := ""
+	if status != "pending" {
+		bump = ", rev = " + nextRev
+	}
+	_, err := s.db.ExecContext(ctx, `UPDATE messages SET transcript = ?, transcript_status = ?`+bump+` WHERE chat_jid = ? AND id = ? AND deleted = 0`, text, status, chat, id)
+	return err
+}
+
+// VoiceBacklog returns voice notes since t that have a file but no
+// transcript yet, oldest first.
+func (s *Store) VoiceBacklog(ctx context.Context, since time.Time, limit int) ([]Message, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+msgCols+` FROM messages
+		WHERE kind = 'voice' AND deleted = 0 AND media_path <> '' AND transcript_status IN ('', 'pending') AND ts >= ?
+		ORDER BY ts LIMIT ?`, since.Unix(), limit)
 	if err != nil {
 		return nil, err
 	}

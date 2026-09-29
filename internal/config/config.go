@@ -33,6 +33,15 @@ type Config struct {
 	Send        Scope
 	HistorySync bool
 	DeviceName  string
+
+	Transcription Transcription
+}
+
+// Transcription of voice notes (SPEC.md, 0.2).
+type Transcription struct {
+	Enabled bool // default true; takes effect once wa_transcription_setup installed the engine
+	Threads int  // engine threads, default 2
+	Batch   int  // segments per engine run, default 2 (about 1.3 GB of memory)
 }
 
 type rawScope struct {
@@ -47,6 +56,12 @@ type rawConfig struct {
 	Send        *rawScope `json:"send"`
 	HistorySync bool      `json:"history_sync"`
 	DeviceName  string    `json:"device_name"`
+
+	Transcription *struct {
+		Enabled *bool `json:"enabled"`
+		Threads int   `json:"threads"`
+		Batch   int   `json:"batch"`
+	} `json:"transcription"`
 }
 
 var (
@@ -97,6 +112,24 @@ func Parse(data []byte, path string) (*Config, error) {
 	}
 
 	var errs []string
+	cfg.Transcription = Transcription{Enabled: true, Threads: 2, Batch: 2}
+	if t := raw.Transcription; t != nil {
+		if t.Enabled != nil {
+			cfg.Transcription.Enabled = *t.Enabled
+		}
+		if t.Threads != 0 {
+			cfg.Transcription.Threads = t.Threads
+		}
+		if t.Batch != 0 {
+			cfg.Transcription.Batch = t.Batch
+		}
+		if cfg.Transcription.Threads < 1 || cfg.Transcription.Threads > 16 {
+			errs = append(errs, "transcription.threads: čeká číslo 1 až 16")
+		}
+		if cfg.Transcription.Batch < 1 || cfg.Transcription.Batch > 8 {
+			errs = append(errs, "transcription.batch: čeká číslo 1 až 8")
+		}
+	}
 	cfg.Read, errs = parseScope("read", raw.Read, errs)
 	cfg.Send, errs = parseScope("send", raw.Send, errs)
 	if raw.Read != nil && len(raw.Read.Files) > 0 {

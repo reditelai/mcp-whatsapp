@@ -2,5 +2,6 @@
   "read": { "chats": "all", "groups": false },
   "send": { "chats": ["+420777123456"], "groups": false, "files": [] },
   "history_sync": false,
+  "transcription": { "enabled": true, "threads": 2, "batch": 2 },
   "device_name": "Miládka"
 }

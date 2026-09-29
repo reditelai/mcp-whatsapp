@@ -156,6 +156,21 @@ vytvořením kódu a jeho zobrazením ubírá uživateli čas na naskenování.
 - Když má denní přehled, přidej do jeho postupu krok „nové zprávy na
   WhatsAppu" (část B) a udělej generálku jako u jiných změn přehledu.
 
+### A8. Přepis hlasovek
+
+Nabídni ho: hlasovky pak přijdou i jako text a uživatel ti může diktovat.
+Přepis běží v počítači, nic neodchází ven.
+
+1. Řekni, co to stojí: **jednorázové stažení asi 510 MB**, na disku asi
+   700 MB, při přepisu chvíli 1 až 1,5 GB paměti.
+2. Po souhlasu zavolej `wa_transcription_setup`. Stahování běží na pozadí,
+   průběh je ve `wa_status`, `transcription.progress`. Za pár minut
+   `transcription.state` přejde na `ready`.
+3. Když nechce, nic nedělej. Hlasovky dál přijdou jako soubory.
+
+Na slabém stroji (4 GB paměti a méně) navrhni v `config.json`
+`"transcription": {"batch": 1}`.
+
 ## Část B - provoz
 
 ### Stavy
@@ -175,13 +190,20 @@ vytvořením kódu a jeho zobrazením ubírá uživateli čas na naskenování.
 
 1. `wa_new_messages` s kurzorem ze `system/whatsapp-kotva.md`.
 2. Projdi zprávy, co se týká úkolů a lidí, zapiš do vaultu podle svých
-   pravidel. Hlasovky (`kind: "voice"`) mají soubor v `media_path`; přepis
-   zatím neumíš, řekni, že přišla hlasovka od koho a jak dlouhá.
+   pravidel. Hlasovky (`kind: "voice"`) mají soubor v `media_path` a po
+   instalaci přepisu i text.
    - **Upravená zpráva** přijde znovu se stejným `id` a `edited: true`,
      **smazaná pro všechny** s `deleted: true` a bez textu. Oprav podle toho,
      co sis z ní zapsala.
    - **`from_me: true`** je zpráva, kterou poslal uživatel (nebo ty). Je to
      kontext rozhovoru, ne nové zadání.
+   - **Hlasovka** přijde nejdřív s `transcript_status: "pending"` a za chvíli
+     znovu se stejným `id` a textem v `transcript`. Ber ji podle přepisu, ale
+     **jména, čísla a termíny** si u uživatele potvrď, když na nich záleží -
+     přepis je strojový. `failed: …` nebo hlasovka starší než 7 dní:
+     `wa_transcribe`. Bez nainstalovaného přepisu (`transcription.state`
+     není `ready`) řekni, že přišla hlasovka od koho a jak dlouhá, a nabídni
+     přepis (A8).
 3. Nový `cursor` zapiš do kotvy. Když je `has_more`, opakuj.
 
 Kurzor se posouvá, i když zprávy jen projdeš. Co z nich vzešlo, zapiš dřív

@@ -35,3 +35,16 @@ This product depends on whatsmeow (https://github.com/tulir/whatsmeow),
 licensed under the Mozilla Public License 2.0. whatsmeow is not modified
 and not included in this repository; its source code is available at
 https://github.com/tulir/whatsmeow.
+
+The binary also includes, unmodified, these Go libraries under their own
+licenses: github.com/mark3labs/mcp-go (MIT), github.com/pion/opus (MIT),
+modernc.org/sqlite (BSD-3-Clause), github.com/gofrs/flock (BSD-3-Clause),
+rsc.io/qr (BSD-3-Clause), google.golang.org/protobuf (BSD-3-Clause).
+
+Voice note transcription downloads at the user's request, from their
+upstream releases (not included in this repository or its binaries):
+- sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx), Apache License 2.0,
+  with ONNX Runtime (MIT);
+- the model NVIDIA Parakeet TDT 0.6B v3 in the sherpa-onnx int8 conversion
+  (https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), Creative Commons
+  Attribution 4.0 (CC BY 4.0), by NVIDIA.

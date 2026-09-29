@@ -172,22 +172,50 @@ zařízením se navzájem shazují. Proto:
 | `wa_send_file` | soubor s popiskem, stejná pravidla |
 | `wa_download_media` | cesta ke staženému souboru zprávy |
 | `wa_mark_read` | označí chat jako přečtený v telefonu |
+| `wa_transcription_setup` | stáhne a ověří engine a model pro přepis hlasovek (0.2) |
+| `wa_transcribe` | přepíše jednu hlasovku hned (0.2) |
 
 Chyby vrací nástroje jako `{"error": {"code": "…", "message": "…"}}`.
 
 ## Další verze
 
-- **0.2 - přepis hlasovek.** Lokálně, model Parakeet v3 přes sherpa-onnx
-  (hotové binárky pro všechny systémy), čeština na úrovni Whisperu large-v3.
-  Engine a model stáhne server sám při zapnutí, s kontrolou součtů. Opus se
-  dekóduje v Go, bez ffmpeg. Přepis označený jako přepis, zvuk zůstává.
-  Cloudový přepis jen jako volba, výchozí vypnuto. Před rozhodnutím test na
-  zhruba 20 skutečných hlasovkách (Parakeet proti Whisperu turbo).
+- **0.2 - přepis hlasovek** (hotové, viz „Přepis hlasovek" níž).
 - **0.3 - příchozí zprávy do konverzace** přes `claude/channel`, až po ověření.
   Podle hlášených chyb Claude Code se v nečinné konverzaci ztrácejí; do té
   doby jsou hlavní cestou `wa_new_messages` a denní přehled.
 - **1.0 - návod pro asistenta** (`docs/pro-asistenta.md`, instalace a provoz),
   článek na miladka.cz, info kanál, test na Windows i Macu.
+
+## Přepis hlasovek
+
+- **Lokálně, nic neodchází.** Model **Parakeet TDT 0.6B v3** (NVIDIA, čeština
+  na FLEURS 11,0 % WER, Whisper large-v3 11,3 %) přes **sherpa-onnx** (Apache-2.0),
+  hotové binárky pro všech šest cílů. Server engine spouští jako podproces,
+  sám zůstává v čistém Go.
+- **Instalace na souhlas uživatele:** `wa_transcription_setup` stáhne engine
+  (asi 20 MB) a model (487 MB) z releasů sherpa-onnx, **ověří SHA-256**
+  (připnuté v kódu) a rozbalí jen potřebné soubory do `stt/` v datové složce
+  (asi 700 MB). Stav a průběh ve `wa_status`, `transcription`.
+- **Opus se dekóduje v Go** (`pion/opus`), bez ffmpeg: 16 kHz mono WAV.
+- **Dlouhé hlasovky se dělí** v nejtišších místech na úseky do 25 s. Dvě
+  minuty vcelku dopadly znatelně hůř a vzaly 2 GB paměti; po úsecích bez
+  chyby. Úseky jdou do enginu po dvou (`transcription.batch`), model se načte
+  jednou za dávku.
+- **Změřeno na derfl-srv1** (2 vCPU, 29. 9. 2026): 13,6 s řeči za 3,2 s plus
+  3,7 s načtení modelu; paměť 1,1 GB na jeden úsek, asi 0,23 GB na každý další
+  v dávce.
+- **Tok:** hlasovka se stáhne, dostane `transcript_status: pending`, jediný
+  pracovník ve instanci se zámkem ji přepíše a uloží `transcript` s `done`
+  (nebo `failed: …`). Hotový přepis je změna: zpráva přijde znovu ve
+  `wa_new_messages`. Po instalaci a po restartu se dopíší hlasovky z posledních
+  7 dní, starší na požádání (`wa_transcribe`).
+- **Přepis je strojový**: asistent podle něj jedná, ale jména, čísla a termíny
+  potvrdí, když na nich záleží.
+- Konfigurace `transcription`: `enabled` (výchozí `true`, platí až po
+  instalaci), `threads` (výchozí 2), `batch` (výchozí 2).
+- Whisper jsme neporovnávali: Parakeet přepsal skutečnou hlasovku bez chyby
+  a podle zveřejněných měření je na češtině stejně přesný a několikrát
+  rychlejší. Cloudový přepis zatím není.
 
 ## Údržba
 

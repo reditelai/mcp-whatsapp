@@ -27,7 +27,9 @@ Start with wa_status. If state is not_paired or logged_out, pair with wa_pair. P
 
 The server only sees chats the config allows to read, and only sends where the config allows. A send_forbidden error is the user's setting: tell them, never work around it. Send only messages the user explicitly asked you to send in this conversation.
 
-New messages: call wa_new_messages with the cursor you got last time and keep the returned cursor (for example in the vault), like a mail anchor. It also returns messages that were edited (edited: true, new text) or deleted for everyone (deleted: true, no text) since the cursor; update what you noted from them. Messages with from_me: true were sent by the user (or by you) and are context, not new requests. Voice notes arrive as kind "voice" with a media file.
+New messages: call wa_new_messages with the cursor you got last time and keep the returned cursor (for example in the vault), like a mail anchor. It also returns messages that were edited (edited: true, new text) or deleted for everyone (deleted: true, no text) since the cursor; update what you noted from them. Messages with from_me: true were sent by the user (or by you) and are context, not new requests.
+
+Voice notes (kind "voice") are transcribed locally once the engine is installed: wa_status shows transcription.state. If it is not_installed, offer the user to set it up (a one-time download of about 510 MB) and call wa_transcription_setup only after they agree. A voice note comes first with transcript_status "pending" and again, with the same id, once transcript is filled in. The transcript is machine made and may contain errors: act on it, but confirm names, numbers and dates with the user when they matter.
 
 State locked_by_other_instance means another Claude conversation holds the WhatsApp connection: reading works, sending and pairing do not. Full guide for assistants: https://github.com/reditelai/mcp-whatsapp/blob/main/docs/pro-asistenta.md`
 
@@ -99,6 +101,15 @@ func Register(s *server.MCPServer, m *wa.Manager) {
 		mcp.WithString("chat", mcp.Required()),
 		mcp.WithString("id", mcp.Required(), mcp.Description("Message id"))), h.downloadMedia)
 
+	s.AddTool(mcp.NewTool("wa_transcription_setup",
+		mcp.WithDescription("Install the local voice note transcription (Parakeet v3 via sherpa-onnx): downloads about 510 MB once, checks it and returns at once; progress is in wa_status (transcription). Only after the user agreed to the download. Voice notes from the last 7 days get transcribed when it is ready."),
+	), h.transcriptionSetup)
+
+	s.AddTool(mcp.NewTool("wa_transcribe",
+		mcp.WithDescription("Transcribe one voice note now and return it, e.g. an older one or one whose transcript_status is failed. Takes a few seconds."),
+		mcp.WithString("chat", mcp.Required()),
+		mcp.WithString("id", mcp.Required(), mcp.Description("Message id"))), h.transcribe)
+
 	s.AddTool(mcp.NewTool("wa_mark_read",
 		mcp.WithDescription("Mark the latest incoming messages of a chat as read on the user's phone. Only when the user wants it: read receipts are visible to the sender."),
 		mcp.WithString("chat", mcp.Required())), h.markRead)
@@ -138,6 +149,8 @@ func fail(err error) (*mcp.CallToolResult, error) {
 		return toolError("send_forbidden", msg+". This is the user's setting in config.json; tell the user, do not work around it."), nil
 	case errors.Is(err, wa.ErrReadForbidden):
 		return toolError("read_forbidden", "The config does not allow reading this chat."), nil
+	case errors.Is(err, wa.ErrNotVoice):
+		return toolError("not_voice", "That message is not a voice note or audio."), nil
 	case errors.Is(err, appstore.ErrNotFound):
 		return toolError("not_found", "Message or chat not found in stored messages."), nil
 	default:
@@ -179,6 +192,7 @@ func (h *handlers) status(ctx context.Context, _ mcp.CallToolRequest) (*mcp.Call
 	chats, msgs, _ := h.m.Store().Counts(ctx)
 	return jsonResult(map[string]any{
 		"status":          st,
+		"transcription":   h.m.Transcription().Status(),
 		"read":            scopeSummary(cfg.Read.AllChats, cfg.Read.Chats, cfg.Read.AllGroups, cfg.Read.Groups),
 		"send":            scopeSummary(cfg.Send.AllChats, cfg.Send.Chats, cfg.Send.AllGroups, cfg.Send.Groups),
 		"send_file_dirs":  append([]string{}, cfg.Send.FileDirs...),
@@ -441,6 +455,32 @@ func (h *handlers) downloadMedia(ctx context.Context, req mcp.CallToolRequest) (
 		return fail(err)
 	}
 	return jsonResult(map[string]any{"path": path})
+}
+
+func (h *handlers) transcriptionSetup(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if err := h.m.SetupTranscription(); err != nil {
+		return fail(err)
+	}
+	return jsonResult(map[string]any{
+		"transcription": h.m.Transcription().Status(),
+		"next":          "The download runs in the background. Check wa_status (transcription.state) in a minute or two; when it is ready, voice notes get transcribed.",
+	})
+}
+
+func (h *handlers) transcribe(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	chat, errRes := h.chatArg(ctx, req)
+	if errRes != nil {
+		return errRes, nil
+	}
+	id, err := req.RequireString("id")
+	if err != nil {
+		return toolError("invalid_argument", "id is required"), nil
+	}
+	msg, err := h.m.TranscribeNow(ctx, chat, id)
+	if err != nil {
+		return fail(err)
+	}
+	return jsonResult(map[string]any{"message": msg})
 }
 
 func (h *handlers) markRead(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
