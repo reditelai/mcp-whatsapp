@@ -46,7 +46,9 @@ curl -s https://api.github.com/repos/reditelai/mcp-whatsapp/releases/latest
 ```
 
 Verze je v `tag_name` (dál `VERZE`). Stáhni binárku a `SHA256SUMS` do
-`$HOME/mcp-whatsapp/`:
+`$HOME/mcp-whatsapp/`. Když ta složka už existuje a je v ní něco jiného než
+binárka serveru (třeba zdrojový kód), použij `$HOME/mcp-whatsapp-bin/` a dál
+počítej s ní:
 
 ```sh
 mkdir -p "$HOME/mcp-whatsapp" && cd "$HOME/mcp-whatsapp"
@@ -147,7 +149,8 @@ vytvořením kódu a jeho zobrazením ubírá uživateli čas na naskenování.
 
 - Zapiš do `system/moduly-instalovane.json` záznam
   `{"id": "whatsapp", "verze": "X.Y.Z", "nainstalovano": "RRRR-MM-DD"}`
-  (verze bez „v").
+  (verze bez „v"). Od Miládky 1.9 je soubor v balíčku; když chybí, založ ho
+  ve tvaru `{"moduly": []}`.
 - Založ `system/whatsapp-kotva.md` s kurzorem z prvního `wa_new_messages`
   (bez `cursor`). Viz část B.
 - Když má denní přehled, přidej do jeho postupu krok „nové zprávy na
@@ -206,13 +209,28 @@ a řekni mu, že platí od nové konverzace (server se načte znovu).
 
 Novou verzi hlásí info kanál Miládky. Postup:
 
+Registrace v Claude Code se nemění, jen se vymění soubor, na který ukazuje.
+Běžící server předá spojení nové verzi sám. Postup:
+
 1. Přečti `CHANGELOG.md` nové verze a všech mezi jeho a novou
    (`https://raw.githubusercontent.com/reditelai/mcp-whatsapp/VERZE/CHANGELOG.md`).
    Podsekce „Při aktualizaci" proveď se souhlasem uživatele.
-2. Stáhni novou binárku a součty (A2) vedle staré, ověř, a starou nahraď.
-3. Nová konverzace, `wa_status`. Spárování zůstává, klíče jsou v datové
-   složce.
-4. Zapiš novou verzi do `system/moduly-instalovane.json`.
+2. **Stáhni vedle a ověř:** novou binárku a `SHA256SUMS` (A2) do stejné
+   složky jako starou, pod jménem `SOUBOR.new` (na Windows `SOUBOR.new.exe`),
+   ověř součet a `--version`.
+3. **Vyměň přejmenováním**, ne přepsáním - běžící binárku na Windows přepsat
+   nejde, přejmenovat ano:
+   - starou přejmenuj na `SOUBOR.old` (Windows `SOUBOR.old.exe`),
+   - novou přejmenuj na původní jméno `SOUBOR`.
+4. **Požádej uživatele o novou konverzaci.** Nová verze se spustí, starou
+   požádá o předání a ta se sama odpojí a skončí. V nové konverzaci
+   `wa_status`: do pár sekund `connected`, spárování zůstává (klíče jsou
+   v datové složce). Když i po minutě hlásí `locked_by_other_instance`, drží
+   spojení verze, která předání nezná (0.1.0): ukonči ji podle
+   `lock_holder_pid` (`kill PID`, na Windows `taskkill /PID PID /F`).
+5. Smaž `SOUBOR.old` a zapiš novou verzi do `system/moduly-instalovane.json`.
+
+Když cokoli selže, vrať `SOUBOR.old` na původní jméno a řekni to uživateli.
 
 ### B6. Odpojení
 

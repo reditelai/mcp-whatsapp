@@ -57,6 +57,14 @@ zařízením se navzájem shazují. Proto:
   odesílání a párování odmítne s `locked_by_other_instance` a zámek zkouší
   převzít každých 30 s. Když první konverzace skončí, druhá spojení převezme
   sama.
+- **Předání mezi verzemi.** Claude Code po přeregistrování nebo reconnectu
+  starý proces serveru vždy neukončí (29. 9. 2026 u Věrky) a na Windows
+  běžící binárku nejde přepsat. Držitel zámku proto zapisuje do `lock.pid`
+  svou verzi. Instance **jiné verze** ho požádá o předání (`handover.json`),
+  držitel se odpojí, uvolní zámek a skončí, nová verze převezme spojení do
+  pár sekund. Dvě instance téže verze jsou dvě konverzace a nepředávají si
+  nic. Verze 0.1.0 předání nezná, tu je při první aktualizaci potřeba
+  ukončit ručně.
 
 ## Konfigurace
 

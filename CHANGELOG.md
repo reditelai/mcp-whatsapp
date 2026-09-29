@@ -5,6 +5,18 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [0.1.1] - 2026-09-29
+
+Aktualizace serveru bez zásahu: nová verze převezme spojení od staré sama, i na Windows.
+
+- Běžící server předá spojení instanci jiné verze a skončí; dvě konverzace se stejnou verzí se dál nepřetahují.
+- Návod: aktualizace výměnou souboru přejmenováním (na Windows běžící binárku nejde přepsat), návrat při selhání, založení `moduly-instalovane.json`, když chybí.
+
+### Při aktualizaci
+
+- Nastavení se nemění. Postup je v `docs/pro-asistenta.md`, B5.
+- **Z 0.1.0:** stará verze předání nezná. Když nová po minutě hlásí `locked_by_other_instance`, ukonči starý proces podle `lock_holder_pid` (B5, krok 4).
+
 ## [0.1.0] - 2026-09-29
 
 První verze: asistent čte a posílá zprávy na WhatsAppu a nastaví ho celý z chatu.

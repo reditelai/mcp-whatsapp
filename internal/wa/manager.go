@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -130,8 +129,8 @@ func (m *Manager) Status() Status {
 		st.Phone = "+" + m.cli.Store.ID.User
 	}
 	if m.state == StateLocked {
-		if b, err := os.ReadFile(m.lock.Path() + ".pid"); err == nil {
-			st.LockHolder = strings.TrimSpace(string(b))
+		if h, ok := m.readHolder(); ok {
+			st.LockHolder = strconv.Itoa(h.PID)
 		}
 	}
 	return st
@@ -141,23 +140,44 @@ func (m *Manager) Status() Status {
 // tells), then connects in the background, or waits for the lock.
 func (m *Manager) Start(ctx context.Context) {
 	if m.tryLock() {
+		go m.watchHandover(ctx)
 		go m.startSession(ctx)
 		return
 	}
-	m.setState(StateLocked, "Spojení s WhatsAppem drží jiná instance serveru (jiná konverzace). Čtení uložených zpráv funguje, odesílání a párování ne.")
+	handover := m.requestHandover()
+	if handover {
+		m.setState(StateLocked, "Spojení drží jiná verze serveru. Požádala jsem ji o předání, převezmu ho během pár sekund.")
+	} else {
+		m.setState(StateLocked, "Spojení s WhatsAppem drží jiná instance serveru (jiná konverzace). Čtení uložených zpráv funguje, odesílání a párování ne.")
+	}
 	go func() {
-		t := time.NewTicker(lockRetryInterval)
+		started := time.Now()
+		interval := lockRetryInterval
+		if handover {
+			interval = handoverRetry
+		}
+		t := time.NewTicker(interval)
 		defer t.Stop()
+		warned := false
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				if m.tryLock() {
-					m.log.Infof("lock acquired, taking over the connection")
-					m.startSession(ctx)
-					return
+			}
+			if m.tryLock() {
+				m.log.Infof("lock acquired, taking over the connection")
+				go m.watchHandover(ctx)
+				m.startSession(ctx)
+				return
+			}
+			if handover && !warned && time.Since(started) > handoverRetryFor {
+				warned = true
+				pid := ""
+				if h, ok := m.readHolder(); ok {
+					pid = strconv.Itoa(h.PID)
 				}
+				m.setState(StateLocked, "Spojení drží starší instance serveru, která předání nezná (verze 0.1.0), PID "+pid+". Je potřeba ji ukončit; pak spojení převezmu sama.")
 			}
 		}
 	}()
@@ -173,7 +193,7 @@ func (m *Manager) tryLock() bool {
 		m.mu.Lock()
 		m.holdsLock = true
 		m.mu.Unlock()
-		_ = os.WriteFile(m.lock.Path()+".pid", []byte(strconv.Itoa(os.Getpid())), 0o600)
+		m.writeHolder()
 	}
 	return ok
 }
