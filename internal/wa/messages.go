@@ -418,7 +418,10 @@ func (m *Manager) mediaPath(ctx context.Context, msg *appstore.Message) (string,
 			folder = "+" + c.Phone
 		}
 	}
-	folder = safeName(folder, 60)
+	folder, err := m.st.MediaFolder(ctx, msg.Chat, safeName(folder, 60))
+	if err != nil {
+		return "", err
+	}
 	dir := filepath.Join(m.cfg.MediaDir, folder)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err

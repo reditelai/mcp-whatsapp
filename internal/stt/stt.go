@@ -152,7 +152,7 @@ func (e *Engine) Status() Status {
 	defer e.mu.Unlock()
 	st := Status{State: e.state, Error: e.errText, Progress: e.progress, Model: "Parakeet TDT 0.6B v3"}
 	if e.state == StateNotInstalled {
-		st.Download = "about 510 MB (engine about 20 MB, model 487 MB), about 1 GB on disk"
+		st.Download = "about 510 MB (engine about 20 MB, model 487 MB), about 700 MB on disk"
 	}
 	return st
 }

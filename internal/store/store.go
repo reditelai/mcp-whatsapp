@@ -107,7 +107,8 @@ CREATE TABLE IF NOT EXISTS chats (
 	kind            TEXT NOT NULL,
 	phone           TEXT NOT NULL DEFAULT '',
 	name            TEXT NOT NULL DEFAULT '',
-	last_message_at INTEGER NOT NULL DEFAULT 0
+	last_message_at INTEGER NOT NULL DEFAULT 0,
+	media_folder    TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS messages (
 	seq          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -153,13 +154,14 @@ func (s *Store) migrate() error {
 		return err
 	}
 	// Columns added after the first installs (0.1.0).
-	for _, c := range []struct{ name, ddl string }{
-		{"rev", `ALTER TABLE messages ADD COLUMN rev INTEGER NOT NULL DEFAULT 0; UPDATE messages SET rev = seq`},
-		{"transcript", `ALTER TABLE messages ADD COLUMN transcript TEXT NOT NULL DEFAULT ''`},
-		{"transcript_status", `ALTER TABLE messages ADD COLUMN transcript_status TEXT NOT NULL DEFAULT ''`},
+	for _, c := range []struct{ table, name, ddl string }{
+		{"chats", "media_folder", `ALTER TABLE chats ADD COLUMN media_folder TEXT NOT NULL DEFAULT ''`},
+		{"messages", "rev", `ALTER TABLE messages ADD COLUMN rev INTEGER NOT NULL DEFAULT 0; UPDATE messages SET rev = seq`},
+		{"messages", "transcript", `ALTER TABLE messages ADD COLUMN transcript TEXT NOT NULL DEFAULT ''`},
+		{"messages", "transcript_status", `ALTER TABLE messages ADD COLUMN transcript_status TEXT NOT NULL DEFAULT ''`},
 	} {
 		var n int
-		if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name = ?`, c.name).Scan(&n); err != nil {
+		if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, c.table, c.name).Scan(&n); err != nil {
 			return err
 		}
 		if n == 0 {
@@ -267,6 +269,22 @@ func upsertChat(ctx context.Context, tx *sql.Tx, jid, kind, phone, name string, 
 			last_message_at = MAX(chats.last_message_at, excluded.last_message_at)`,
 		jid, kind, phone, name, at.Unix())
 	return err
+}
+
+// MediaFolder returns the media folder name fixed for a chat, or sets it
+// to proposed when the chat has none yet. Fixed at the first media file so
+// that a contact renaming themselves does not split their files.
+func (s *Store) MediaFolder(ctx context.Context, jid, proposed string) (string, error) {
+	var cur string
+	err := s.db.QueryRowContext(ctx, `SELECT media_folder FROM chats WHERE jid = ?`, jid).Scan(&cur)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	if cur != "" {
+		return cur, nil
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE chats SET media_folder = ? WHERE jid = ?`, proposed, jid)
+	return proposed, err
 }
 
 // SetChatName updates a chat's display name (contact or group name).

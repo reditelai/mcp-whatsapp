@@ -296,8 +296,10 @@ Když cokoli selže, vrať `SOUBOR.old` na původní jméno a řekni to uživate
   `system/moduly-instalovane.json` stáhni binárku pro nový systém (A1, A2)
   do stejné složky, starou smaž. Přepis hlasovek (`.doplnky/prepis`) stáhni
   znovu přes `wa_transcription_setup`, engine je taky pro konkrétní systém.
-- **Dva počítače zároveň** (vault synchronizovaný zálohou): `.doplnky/` se
-  nezálohuje, každý počítač má vlastní instalaci. **Klíče (`data/`) mezi
+- **Dva počítače zároveň** (vault synchronizovaný zálohou): `.mcp.json` přijde
+  zálohou sám, ale `.doplnky/` se
+  nezálohuje, takže na druhém stroji server nenaběhne, dokud tam nestáhneš
+  binárku (A1, A2). Každý počítač má vlastní instalaci. **Klíče (`data/`) mezi
   počítači nikdy nekopíruj** - dvě stejná zařízení by se přetahovala. Na
   druhém počítači spáruj WhatsApp znovu (je to další propojené zařízení),
   nebo ho nech jen na jednom.

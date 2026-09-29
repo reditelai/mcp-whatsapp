@@ -114,3 +114,19 @@ func TestRelativeMedia(t *testing.T) {
 		t.Fatalf("after move %q", m.MediaPath)
 	}
 }
+
+func TestMediaFolderStays(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	s.SaveMessage(ctx, NewMessage{Chat: "c", ChatKind: "direct", ChatName: "Jana", ID: "a", Time: time.Now(), Kind: "image"})
+	if f, _ := s.MediaFolder(ctx, "c", "Jana"); f != "Jana" {
+		t.Fatalf("first: %q", f)
+	}
+	if f, _ := s.MediaFolder(ctx, "c", "Jana Nová"); f != "Jana" {
+		t.Fatalf("after rename: %q", f)
+	}
+}

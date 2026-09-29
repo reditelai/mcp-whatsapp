@@ -152,7 +152,8 @@ zařízením se navzájem shazují. Proto:
   z telefonu (asistent pak vidí celý rozhovor).
 - **Média se stahují hned při příchodu** (odkazy WhatsAppu po čase vyprší) do
   `media_dir`, v Miládce `vstupy/whatsapp/<jméno chatu>/<datum>_<čas>_<druh>.<přípona>`,
-  čitelně pro člověka (Karel, 29. 9. 2026). `vstupy/` je v `.gitignore`.
+  čitelně pro člověka (Karel, 29. 9. 2026). Název složky se určí u prvního
+  média a pak se nemění, i když si kontakt změní jméno. `vstupy/` je v `.gitignore`.
   Cesty se v databázi drží relativně ke složce médií, přesun vaultu je
   nerozbije.
 - **Úklid:** média starší než `media_keep_days` (výchozí 30, `0` = nikdy)
