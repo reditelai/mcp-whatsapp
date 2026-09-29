@@ -27,6 +27,13 @@ jobs:
       - name: Aktualizace
         id: zmena
         run: |
+          # Dokud nevyšla první verze, není co udržovat.
+          git fetch --tags --quiet
+          if [ -z "$(git tag -l 'v*')" ]; then
+            echo "Zatím žádná vydaná verze, aktualizace se přeskakuje."
+            echo "zmena=ne" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           go get go.mau.fi/whatsmeow@latest
           go mod tidy
           if git diff --quiet go.mod go.sum; then

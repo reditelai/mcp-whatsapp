@@ -40,14 +40,14 @@ func TestSaveSearchCursor(t *testing.T) {
 	if res, _ := s.Search(ctx, "moc", "", time.Time{}, time.Time{}, 10); len(res) != 1 || !res[0].Edited {
 		t.Fatalf("edit not searchable: %+v", res)
 	}
-	if err := s.DeleteMessage(ctx, "420777000111@s.whatsapp.net", "a"); err != nil {
+	if _, err := s.DeleteMessage(ctx, "420777000111@s.whatsapp.net", "a"); err != nil {
 		t.Fatal(err)
 	}
 	if res, _ := s.Search(ctx, "devet", "", time.Time{}, time.Time{}, 10); len(res) != 0 {
 		t.Fatalf("deleted still found: %+v", res)
 	}
-	chats, _ := s.Chats(ctx, "", 10)
-	if len(chats) != 1 || chats[0].Messages != 3 {
+	chats, _ := s.Chats(ctx, "+420 777", 10)
+	if len(chats) != 1 || chats[0].Messages != 3 || chats[0].Phone != "+420777000111" {
 		t.Fatalf("chats: %+v", chats)
 	}
 }

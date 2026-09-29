@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS messages (
 	media_path   TEXT NOT NULL DEFAULT '',
 	edited       INTEGER NOT NULL DEFAULT 0,
 	deleted      INTEGER NOT NULL DEFAULT 0,
+	raw_chat     TEXT NOT NULL DEFAULT '',
+	raw_sender   TEXT NOT NULL DEFAULT '',
 	UNIQUE (chat_jid, id)
 );
 CREATE INDEX IF NOT EXISTS messages_chat_ts ON messages (chat_jid, ts);
@@ -127,6 +129,11 @@ type Message struct {
 	Edited      bool   `json:"edited,omitempty"`
 	Deleted     bool   `json:"deleted,omitempty"`
 
+	// Addresses exactly as WhatsApp sent them (possibly LIDs); receipts and
+	// reply quotes must use these, not the rewritten phone-number form.
+	RawChat   string `json:"-"`
+	RawSender string `json:"-"`
+
 	ts       time.Time
 	mediaRef []byte
 }
@@ -142,6 +149,7 @@ type NewMessage struct {
 	MediaMime, MediaName                string
 	MediaSize                           int64
 	MediaRef                            []byte
+	RawChat, RawSender                  string
 }
 
 // SaveMessage stores a message and upserts its chat. A message that is
@@ -157,10 +165,10 @@ func (s *Store) SaveMessage(ctx context.Context, m NewMessage) (inserted bool, e
 	}
 	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO messages
 		(chat_jid, id, sender_jid, sender_phone, sender_name, from_me, ts, kind, text, quoted_id,
-		 media_mime, media_name, media_size, media_ref)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		 media_mime, media_name, media_size, media_ref, raw_chat, raw_sender)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		m.Chat, m.ID, m.SenderJID, m.SenderPhone, m.SenderName, b2i(m.FromMe), m.Time.Unix(),
-		m.Kind, m.Text, m.QuotedID, m.MediaMime, m.MediaName, m.MediaSize, m.MediaRef)
+		m.Kind, m.Text, m.QuotedID, m.MediaMime, m.MediaName, m.MediaSize, m.MediaRef, m.RawChat, m.RawSender)
 	if err != nil {
 		return false, err
 	}
@@ -191,21 +199,28 @@ func (s *Store) EditMessage(ctx context.Context, chat, id, text string) error {
 	return err
 }
 
-// DeleteMessage marks a message as deleted for everyone and drops its text:
-// the sender took it back, so it is not kept.
-func (s *Store) DeleteMessage(ctx context.Context, chat, id string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE messages SET text = '', deleted = 1, media_ref = NULL WHERE chat_jid = ? AND id = ?`, chat, id)
-	return err
+// DeleteMessage marks a message as deleted for everyone and drops its text
+// and media reference: the sender took it back, so it is not kept. It
+// returns the path of the downloaded media file, which the caller removes.
+func (s *Store) DeleteMessage(ctx context.Context, chat, id string) (mediaPath string, err error) {
+	_ = s.db.QueryRowContext(ctx, `SELECT media_path FROM messages WHERE chat_jid = ? AND id = ?`, chat, id).Scan(&mediaPath)
+	_, err = s.db.ExecContext(ctx, `UPDATE messages SET text = '', deleted = 1, media_ref = NULL, media_path = '' WHERE chat_jid = ? AND id = ?`, chat, id)
+	return mediaPath, err
 }
 
 // SetMediaPath records where the downloaded media file is.
-func (s *Store) SetMediaPath(ctx context.Context, chat, id, path string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE messages SET media_path = ? WHERE chat_jid = ? AND id = ?`, path, chat, id)
-	return err
+// A deleted message keeps no media: the update does not apply to it.
+func (s *Store) SetMediaPath(ctx context.Context, chat, id, path string) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE messages SET media_path = ? WHERE chat_jid = ? AND id = ? AND deleted = 0`, path, chat, id)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }
 
 const msgCols = `seq, chat_jid, id, sender_jid, sender_phone, sender_name, from_me, ts, kind, text,
-	quoted_id, media_mime, media_name, media_size, media_path, edited, deleted, media_ref`
+	quoted_id, media_mime, media_name, media_size, media_path, edited, deleted, media_ref, raw_chat, raw_sender`
 
 func scanMessages(rows *sql.Rows) ([]Message, error) {
 	defer rows.Close()
@@ -216,10 +231,11 @@ func scanMessages(rows *sql.Rows) ([]Message, error) {
 		var ts int64
 		if err := rows.Scan(&m.Seq, &m.Chat, &m.ID, &m.SenderJID, &m.SenderPhone, &m.SenderName, &fromMe,
 			&ts, &m.Kind, &m.Text, &m.QuotedID, &m.MediaMime, &m.MediaName, &m.MediaSize, &m.MediaPath,
-			&edited, &deleted, &m.mediaRef); err != nil {
+			&edited, &deleted, &m.mediaRef, &m.RawChat, &m.RawSender); err != nil {
 			return nil, err
 		}
 		m.FromMe, m.Edited, m.Deleted = fromMe == 1, edited == 1, deleted == 1
+		m.SenderPhone = plus(m.SenderPhone)
 		m.ts = time.Unix(ts, 0)
 		m.Time = m.ts.UTC().Format(time.RFC3339)
 		out = append(out, m)
@@ -355,8 +371,7 @@ func (s *Store) Chats(ctx context.Context, query string, limit int) ([]Chat, err
 	var args []any
 	if query != "" {
 		q += ` WHERE c.name LIKE ? OR c.phone LIKE ?`
-		like := "%" + query + "%"
-		args = append(args, like, like)
+		args = append(args, "%"+query+"%", "%"+strings.TrimPrefix(strings.ReplaceAll(query, " ", ""), "+")+"%")
 	}
 	q += ` ORDER BY c.last_message_at DESC LIMIT ?`
 	args = append(args, limit)
@@ -372,6 +387,7 @@ func (s *Store) Chats(ctx context.Context, query string, limit int) ([]Chat, err
 		if err := rows.Scan(&c.JID, &c.Kind, &c.Phone, &c.Name, &at, &c.Messages); err != nil {
 			return nil, err
 		}
+		c.Phone = plus(c.Phone)
 		if at > 0 {
 			c.LastMessageAt = time.Unix(at, 0).UTC().Format(time.RFC3339)
 		}
@@ -402,6 +418,14 @@ func (s *Store) ChatByJID(ctx context.Context, jid string) (*Chat, error) {
 func (s *Store) Counts(ctx context.Context) (chats, messages int, err error) {
 	err = s.db.QueryRowContext(ctx, `SELECT (SELECT COUNT(*) FROM chats), (SELECT COUNT(*) FROM messages)`).Scan(&chats, &messages)
 	return
+}
+
+// plus shows a stored phone number (digits) in international form.
+func plus(phone string) string {
+	if phone == "" {
+		return ""
+	}
+	return "+" + phone
 }
 
 func b2i(b bool) int {

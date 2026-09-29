@@ -191,6 +191,15 @@ Chyby vrací nástroje jako `{"error": {"code": "…", "message": "…"}}`.
   se s aktualizacemi).
 - Druhé zařízení nebo víc čísel v jednom serveru.
 
+## Známá omezení
+
+- **Historie jednoho člověka se může rozdělit.** Když přijde zpráva z LID,
+  který zatím nejde převést na číslo, uloží se pod LID; pozdější zprávy
+  (když už převod známe) pod číslem. `wa_list_chats` pak ukáže dva chaty.
+- **Úpravy zpráv ve stažené historii se ztratí** (`history_sync`): WhatsApp
+  je v historii posílá pod ID původní zprávy, která už uložená je.
+- **Párování přes passkey** server nepodporuje, jen QR a kód.
+
 ## Jak se pozná, že to funguje
 
 Na testovacím čísle, ne hlavním:

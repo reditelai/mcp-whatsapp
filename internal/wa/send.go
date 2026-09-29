@@ -124,8 +124,17 @@ func (m *Manager) replyContext(ctx context.Context, chat, id string) (*waE2E.Con
 		StanzaID:      proto.String(q.ID),
 		QuotedMessage: &waE2E.Message{Conversation: proto.String(q.Text)},
 	}
-	if q.SenderJID != "" && !q.FromMe {
-		ci.Participant = proto.String(q.SenderJID)
+	// The participant must be the address WhatsApp used (possibly a LID),
+	// or the phone will not match the quote to the message.
+	sender := q.RawSender
+	if sender == "" {
+		sender = q.SenderJID
+	}
+	if sender != "" && !q.FromMe {
+		if j, err := types.ParseJID(sender); err == nil {
+			sender = j.ToNonAD().String()
+		}
+		ci.Participant = proto.String(sender)
 	} else if cli, err := m.client(); err == nil && cli.Store.ID != nil {
 		ci.Participant = proto.String(cli.Store.ID.ToNonAD().String())
 	}
@@ -262,19 +271,34 @@ func (m *Manager) MarkRead(ctx context.Context, chat string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	bySender := map[string][]types.MessageID{}
+	// Receipts go to the chat and sender exactly as WhatsApp addressed the
+	// message (whatsmeow does the same for its own receipts).
+	type key struct{ chat, sender string }
+	groups := map[key][]types.MessageID{}
 	for _, msg := range msgs {
-		if !msg.FromMe && msg.Kind != "reaction" {
-			bySender[msg.SenderJID] = append(bySender[msg.SenderJID], msg.ID)
+		if msg.FromMe || msg.Kind == "reaction" {
+			continue
 		}
+		k := key{msg.RawChat, msg.RawSender}
+		if k.chat == "" {
+			k = key{msg.Chat, msg.SenderJID}
+		}
+		if policy.Classify(c) == policy.KindDirect {
+			k.sender = ""
+		}
+		groups[k] = append(groups[k], msg.ID)
 	}
 	n := 0
-	for sender, ids := range bySender {
-		sj, _ := types.ParseJID(sender)
-		if policy.Classify(c) == policy.KindDirect {
-			sj = types.EmptyJID
+	for k, ids := range groups {
+		cj, err := types.ParseJID(k.chat)
+		if err != nil {
+			continue
 		}
-		if err := cli.MarkRead(ctx, ids, time.Now(), c, sj); err != nil {
+		sj := types.EmptyJID
+		if k.sender != "" {
+			sj, _ = types.ParseJID(k.sender)
+		}
+		if err := cli.MarkRead(ctx, ids, time.Now(), cj, sj); err != nil {
 			return n, err
 		}
 		n += len(ids)

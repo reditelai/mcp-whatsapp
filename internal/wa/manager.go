@@ -64,6 +64,8 @@ type Manager struct {
 
 	lock *flock.Flock
 
+	pairMu sync.Mutex // one wa_pair at a time
+
 	mu           sync.Mutex
 	state        State
 	errText      string
@@ -185,10 +187,12 @@ func (m *Manager) startSession(ctx context.Context) {
 	m.mu.Lock()
 	m.container = container
 	m.mu.Unlock()
-	if err := m.newClient(ctx); err != nil {
-		m.setState(StateError, err.Error())
+	device, err := container.GetFirstDevice(ctx)
+	if err != nil {
+		m.setState(StateError, "Nejde načíst zařízení ze session.db: "+err.Error())
 		return
 	}
+	m.newClient(device)
 	m.mu.Lock()
 	paired := m.cli.Store.ID != nil
 	m.mu.Unlock()
@@ -196,32 +200,65 @@ func (m *Manager) startSession(ctx context.Context) {
 		m.setState(StateNotPaired, "")
 		return
 	}
-	m.connect()
+	go m.connect()
 }
 
-// newClient builds a client for the first stored device, or a fresh device.
-func (m *Manager) newClient(ctx context.Context) error {
-	device, err := m.container.GetFirstDevice(ctx)
-	if err != nil {
-		return fmt.Errorf("nejde načíst zařízení ze session.db: %v", err)
-	}
+// newClient replaces the client with one for device, retiring the old one.
+func (m *Manager) newClient(device *store.Device) {
 	cli := whatsmeow.NewClient(device, m.log.Sub("client"))
 	cli.EnableAutoReconnect = true
 	cli.InitialAutoReconnect = true
+	// whatsmeow waits AutoReconnectErrors * 2 s with no upper bound; keep it
+	// at most 5 minutes (SPEC.md, Stav).
+	cli.AutoReconnectHook = func(error) bool {
+		if cli.AutoReconnectErrors > maxReconnectErrors {
+			cli.AutoReconnectErrors = maxReconnectErrors
+		}
+		return true
+	}
 	cli.AddEventHandler(m.handleEvent)
 	m.mu.Lock()
+	old := m.cli
 	m.cli = cli
 	m.mu.Unlock()
-	return nil
+	if old != nil {
+		old.RemoveEventHandlers()
+		old.Disconnect()
+	}
 }
 
+const (
+	maxReconnectErrors = 150 // x 2 s = 5 min
+	retryMax           = 5 * time.Minute
+	pairedConnectWait  = 30 * time.Second
+)
+
+// connect connects the paired client. Errors whatsmeow does not retry by
+// itself are retried here with a growing delay, up to 5 minutes.
 func (m *Manager) connect() {
 	m.setState(StateConnecting, "")
-	m.mu.Lock()
-	cli := m.cli
-	m.mu.Unlock()
-	if err := cli.Connect(); err != nil {
-		m.setState(StateConnecting, "Připojení se nepovedlo, zkouší se znovu: "+err.Error())
+	delay := 5 * time.Second
+	for {
+		m.mu.Lock()
+		cli := m.cli
+		m.mu.Unlock()
+		if cli == nil || cli.Store.ID == nil {
+			return
+		}
+		err := cli.Connect()
+		if err == nil || errors.Is(err, whatsmeow.ErrAlreadyConnected) {
+			return
+		}
+		m.setState(StateConnecting, fmt.Sprintf("Připojení se nepovedlo (%v), další pokus za %s.", err, delay))
+		time.Sleep(delay)
+		switch m.Status().State {
+		case StateConnecting:
+		default:
+			return // connected meanwhile, or a permanent state that must not be retried
+		}
+		if delay *= 2; delay > retryMax {
+			delay = retryMax
+		}
 	}
 }
 
@@ -283,7 +320,9 @@ func (m *Manager) handleEvent(evt any) {
 		m.mu.Unlock()
 		m.setState(StateConnected, "")
 	case *events.Disconnected:
-		m.setState(StateConnecting, "Spojení spadlo, připojuje se znovu.")
+		if m.paired() {
+			m.setState(StateConnecting, "Spojení spadlo, připojuje se znovu.")
+		}
 	case *events.KeepAliveTimeout:
 		if e.ErrorCount >= 3 {
 			m.setState(StateConnecting, "WhatsApp neodpovídá, spojení se obnovuje.")
@@ -293,6 +332,14 @@ func (m *Manager) handleEvent(evt any) {
 	case *events.PairSuccess:
 		m.log.Infof("paired as %s", e.ID)
 		m.setState(StateConnecting, "Spárováno, dokončuje se připojení.")
+		// whatsmeow reconnects by itself after pairing, but only logs when
+		// that fails; make sure the connection comes up.
+		go func() {
+			time.Sleep(pairedConnectWait)
+			if m.Status().State == StateConnecting {
+				m.connect()
+			}
+		}()
 	case *events.PairError:
 		m.setState(StateError, "Párování selhalo: "+e.Error.Error())
 	case *events.LoggedOut:
@@ -318,16 +365,22 @@ func (m *Manager) handleEvent(evt any) {
 	}
 }
 
+func (m *Manager) paired() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.cli != nil && m.cli.Store.ID != nil
+}
+
 func (m *Manager) onLoggedOut() {
 	m.setState(StateLoggedOut, "Zařízení bylo odebráno v telefonu (nebo WhatsApp přihlášení zrušil). Je potřeba znovu spárovat přes wa_pair.")
-	// whatsmeow has already deleted the device keys; prepare a fresh device
-	// so that wa_pair can start right away.
-	go func() {
-		time.Sleep(time.Second)
-		if err := m.newClient(context.Background()); err != nil {
-			m.log.Errorf("new device after logout: %v", err)
-		}
-	}()
+	// whatsmeow deletes the old device keys itself; start from a new device
+	// right away so that wa_pair can run, without waiting for that delete.
+	m.mu.Lock()
+	container := m.container
+	m.mu.Unlock()
+	if container != nil {
+		go m.newClient(container.NewDevice())
+	}
 }
 
 // onOutdated tries the current WhatsApp Web version once, then gives up.
@@ -344,6 +397,15 @@ func (m *Manager) onOutdated() {
 		if err == nil && v != nil {
 			m.log.Infof("client outdated, retrying with WhatsApp Web version %s", v.String())
 			store.SetWAVersion(*v)
+			if cli.Store.ID == nil {
+				// Happened during pairing: the new version applies to the
+				// next pairing attempt.
+				m.setState(StateNotPaired, "WhatsApp odmítl verzi klienta, server přešel na novější. Zavolej wa_pair znovu.")
+				return
+			}
+			// The failed connection set expectDisconnect; a fresh Connect
+			// needs the old socket gone.
+			cli.Disconnect()
 			m.connect()
 			return
 		}
@@ -362,11 +424,19 @@ func (m *Manager) Logout(ctx context.Context) error {
 		return ErrNotReady
 	}
 	if err := cli.Logout(ctx); err != nil {
-		return err
+		// Logout needs a live connection (replaced, outdated, banned...).
+		// whatsmeow's advice: disconnect and delete the keys locally; the
+		// user then removes the device in the phone.
+		m.log.Warnf("logout over the network failed (%v), deleting keys locally", err)
+		cli.Disconnect()
+		if derr := cli.Store.Delete(ctx); derr != nil {
+			return fmt.Errorf("logout failed: %v; local delete failed: %v", err, derr)
+		}
 	}
-	if err := m.newClient(ctx); err != nil {
-		return err
-	}
+	m.mu.Lock()
+	container := m.container
+	m.mu.Unlock()
+	m.newClient(container.NewDevice())
 	m.setState(StateNotPaired, "")
 	return nil
 }
@@ -382,6 +452,6 @@ func (m *Manager) Reconnect() error {
 		return ErrNotReady
 	}
 	cli.Disconnect()
-	m.connect()
+	go m.connect()
 	return nil
 }

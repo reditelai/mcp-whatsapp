@@ -89,27 +89,25 @@ func (m *Manager) onMessage(evt *events.Message, history bool) {
 
 	if pm := msg.GetProtocolMessage(); pm != nil {
 		target := pm.GetKey().GetID()
+		// Edits arrive here too: UnwrapRaw leaves the ProtocolMessage inside
+		// the edited-message wrapper.
 		switch pm.GetType() {
 		case waE2E.ProtocolMessage_REVOKE:
-			if err := m.st.DeleteMessage(ctx, chatKey, target); err != nil {
+			path, err := m.st.DeleteMessage(ctx, chatKey, target)
+			if err != nil {
 				m.log.Warnf("delete %s: %v", target, err)
 			}
-		case waE2E.ProtocolMessage_MESSAGE_EDIT:
-			if err := m.st.EditMessage(ctx, chatKey, target, textOf(pm.GetEditedMessage())); err != nil {
-				m.log.Warnf("edit %s: %v", target, err)
+			if path != "" {
+				_ = os.Remove(path)
 			}
-		}
-		return
-	}
-	if evt.IsEdit {
-		// New-style edit: the unwrapped message carries the new content and
-		// the edited message ID sits in the raw protocol message.
-		target := evt.RawMessage.GetEditedMessage().GetMessage().GetProtocolMessage().GetKey().GetID()
-		if target == "" {
-			target = evt.Info.ID
-		}
-		if err := m.st.EditMessage(ctx, chatKey, target, textOf(msg)); err != nil {
-			m.log.Warnf("edit %s: %v", target, err)
+		case waE2E.ProtocolMessage_MESSAGE_EDIT:
+			// An edit without text (media without caption) must not wipe
+			// the stored text.
+			if t := editedText(pm.GetEditedMessage()); t != "" {
+				if err := m.st.EditMessage(ctx, chatKey, target, t); err != nil {
+					m.log.Warnf("edit %s: %v", target, err)
+				}
+			}
 		}
 		return
 	}
@@ -125,6 +123,8 @@ func (m *Manager) onMessage(evt *events.Message, history bool) {
 		SenderName:  evt.Info.PushName,
 		FromMe:      evt.Info.IsFromMe,
 		Time:        evt.Info.Timestamp,
+		RawChat:     evt.Info.Chat.String(),
+		RawSender:   evt.Info.Sender.String(),
 	}
 	if kind == policy.KindDirect && !evt.Info.IsFromMe {
 		nm.ChatName = evt.Info.PushName
@@ -187,6 +187,9 @@ func fillContent(nm *appstore.NewMessage, msg *waE2E.Message) {
 	case msg.GetDocumentMessage() != nil:
 		dm := msg.GetDocumentMessage()
 		media("document", &waE2E.Message{DocumentMessage: dm}, dm.GetMimetype(), dm.GetFileName(), dm.GetCaption(), dm.GetFileLength(), dm.GetContextInfo())
+	case msg.GetPtvMessage() != nil:
+		vm := msg.GetPtvMessage()
+		media("video_note", &waE2E.Message{PtvMessage: vm}, vm.GetMimetype(), "", "", vm.GetFileLength(), vm.GetContextInfo())
 	case msg.GetStickerMessage() != nil:
 		sm := msg.GetStickerMessage()
 		media("sticker", &waE2E.Message{StickerMessage: sm}, sm.GetMimetype(), "", "", sm.GetFileLength(), sm.GetContextInfo())
@@ -197,20 +200,47 @@ func fillContent(nm *appstore.NewMessage, msg *waE2E.Message) {
 		if nm.Text == "" {
 			nm.Text = formatCoords(l.GetDegreesLatitude(), l.GetDegreesLongitude())
 		}
+	case msg.GetLiveLocationMessage() != nil:
+		l := msg.GetLiveLocationMessage()
+		nm.Kind, nm.Text = "live_location", formatCoords(l.GetDegreesLatitude(), l.GetDegreesLongitude())
 	case msg.GetContactMessage() != nil:
 		nm.Kind, nm.Text = "contact", msg.GetContactMessage().GetDisplayName()
-	case msg.GetPollCreationMessage() != nil, msg.GetPollCreationMessageV3() != nil:
-		p := msg.GetPollCreationMessage()
-		if p == nil {
-			p = msg.GetPollCreationMessageV3()
+	case msg.GetContactsArrayMessage() != nil:
+		var names []string
+		for _, c := range msg.GetContactsArrayMessage().GetContacts() {
+			names = append(names, c.GetDisplayName())
 		}
-		nm.Kind, nm.Text = "poll", p.GetName()
+		nm.Kind, nm.Text = "contact", strings.Join(names, ", ")
+	case msg.GetPollCreationMessage() != nil:
+		nm.Kind, nm.Text = "poll", msg.GetPollCreationMessage().GetName()
+	case msg.GetPollCreationMessageV2() != nil:
+		nm.Kind, nm.Text = "poll", msg.GetPollCreationMessageV2().GetName()
+	case msg.GetPollCreationMessageV3() != nil:
+		nm.Kind, nm.Text = "poll", msg.GetPollCreationMessageV3().GetName()
+	case msg.GetPollCreationMessageV5() != nil:
+		nm.Kind, nm.Text = "poll", msg.GetPollCreationMessageV5().GetName()
 	default:
 		if t := textOf(msg); t != "" {
 			nm.Kind, nm.Text = "text", t
 			nm.QuotedID = msg.GetExtendedTextMessage().GetContextInfo().GetStanzaID()
 		}
 	}
+}
+
+// editedText is the new text of an edit: plain text or a media caption.
+func editedText(msg *waE2E.Message) string {
+	if t := textOf(msg); t != "" {
+		return t
+	}
+	switch {
+	case msg.GetImageMessage() != nil:
+		return msg.GetImageMessage().GetCaption()
+	case msg.GetVideoMessage() != nil:
+		return msg.GetVideoMessage().GetCaption()
+	case msg.GetDocumentMessage() != nil:
+		return msg.GetDocumentMessage().GetCaption()
+	}
+	return ""
 }
 
 func textOf(msg *waE2E.Message) string {
@@ -250,10 +280,16 @@ func (m *Manager) onHistorySync(evt *events.HistorySync) {
 }
 
 func (m *Manager) onPushName(e *events.PushName) {
-	if e.JID.Server != types.DefaultUserServer || e.NewPushName == "" {
+	if e.NewPushName == "" {
 		return
 	}
-	_ = m.st.SetChatName(context.Background(), e.JID.ToNonAD().String(), e.NewPushName)
+	// JID is usually the LID and JIDAlt the phone number; chats are stored
+	// under the phone number when it is known.
+	for _, j := range []types.JID{e.JID, e.JIDAlt} {
+		if !j.IsEmpty() {
+			_ = m.st.SetChatName(context.Background(), j.ToNonAD().String(), e.NewPushName)
+		}
+	}
 }
 
 func (m *Manager) fetchGroupName(cli *whatsmeow.Client, jid types.JID) {
@@ -290,6 +326,9 @@ func (m *Manager) downloadMedia(ctx context.Context, chat, id string) (string, e
 	if err != nil {
 		return "", err
 	}
+	if msg.Deleted {
+		return "", appstore.ErrNotFound
+	}
 	if msg.MediaPath != "" {
 		if _, err := os.Stat(msg.MediaPath); err == nil {
 			return msg.MediaPath, nil
@@ -319,6 +358,8 @@ func (m *Manager) downloadMedia(ctx context.Context, chat, id string) (string, e
 		dl = parent.GetDocumentMessage()
 	case parent.GetStickerMessage() != nil:
 		dl = parent.GetStickerMessage()
+	case parent.GetPtvMessage() != nil:
+		dl = parent.GetPtvMessage()
 	default:
 		return "", appstore.ErrNotFound
 	}
@@ -335,7 +376,13 @@ func (m *Manager) downloadMedia(ctx context.Context, chat, id string) (string, e
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return "", err
 	}
-	if err := m.st.SetMediaPath(ctx, chat, id, path); err != nil {
+	ok, err := m.st.SetMediaPath(ctx, chat, id, path)
+	if err != nil || !ok {
+		// Revoked while downloading: do not keep the file.
+		_ = os.Remove(path)
+		if err == nil {
+			err = appstore.ErrNotFound
+		}
 		return "", err
 	}
 	return path, nil
