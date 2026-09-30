@@ -5,6 +5,16 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.2.1] - 2026-09-30
+
+Automatický režim oprávnění už nemá zastavovat hlídač ani odmítat souhlas majitele z telefonu: návod doplní dva řádky do popisu prostředí.
+
+- Návod B7: se souhlasem uživatele doplnit do `autoMode.environment` v uživatelském nastavení Claude Code řádek, že spuštění hlídače s `--wait` a posun kurzoru jsou běžný provoz, a řádek, že výslovný souhlas majitele (`from_owner: true`) s odesláním konkrétního mailu nebo zprávy platí jako potvrzení uživatele. Bez nich klasifikátor hlídač občas zablokuje a souhlas z telefonu nebere (Věrka 30. 9. 2026, ověřeno u mailu). Zápis jde jen přes „Accept edits". Příkaz nastavení nevypíše, nepřidá řádek dvakrát a bez vlastního seznamu začne `"$defaults"`.
+
+### Při aktualizaci
+
+- Když uživatel používá hlídač, se souhlasem doplň řádky do popisu prostředí automatického režimu podle B7, odstavec „Hlídač a automatický režim oprávnění" (řádek se souhlasem jen s vyplněným `owner`). Potřebuje „Accept edits".
+
 ## [1.2.0] - 2026-09-30
 
 Nastavení se zálohuje s Miládkou: patří do `system/whatsapp.json`, ne mezi hesla.

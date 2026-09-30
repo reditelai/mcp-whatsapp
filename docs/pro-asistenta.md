@@ -292,7 +292,9 @@ vytvořením kódu a jeho zobrazením ubírá uživateli čas na naskenování.
   WhatsAppu" (část B) a hned po něm spuštění hlídače (B7). Udělej generálku
   jako u jiných změn přehledu.
 - **Spusť hlídače** podle B7 a **přidej jeho hook při startu konverzace**
-  (B7, „Hlídač v každé konverzaci"), ať naběhne i v každé další konverzaci.
+  (B7, „Hlídač v každé konverzaci"), ať naběhne i v každé další konverzaci,
+  a **řádky do popisu prostředí automatického režimu** (B7, „Hlídač
+  a automatický režim oprávnění").
 
 ### A8. Přepis hlasovek
 
@@ -447,6 +449,42 @@ zprávu (ranní přehled z cronu přijde sám a hlídače spustí taky). Uživat
 jednou větou, že hlídání naběhne s první zprávou v nové konverzaci nebo
 s ranním přehledem. Zápis do `.claude/settings.json` může zablokovat
 automatický režim oprávnění: požádej o dočasné „Accept edits" jako v A5.
+
+**Hlídač a automatický režim oprávnění.** Klasifikátor automatického režimu
+o Miládce nic neví. Spuštění hlídače na pozadí občas zablokuje (stejný příkaz
+jednou projde a podruhé ne) a hlídač, který nenaběhne, je tichý výpadek.
+Souhlas majitele z WhatsAppu s odesláním mailu nebo zprávy nebere, protože
+ho vidí jako text z nástroje, ne jako pokyn uživatele: kdo Miládku ovládá
+z telefonu, by tak nemohl schválit nic, co jde ven. Proto při nastavení
+hlídače doplň do popisu prostředí automatického režimu dva řádky. Popis se čte
+jen z uživatelského nastavení Claude Code (`~/.claude/settings.json`), ne
+z vaultu. **Zápis tam automatický režim zablokuje a má**: změnu nastavení
+Claude Code musí uživatel vidět a povolit. Řekni mu jednou větou proč,
+požádej o dočasné „Accept edits" (Claude Code se u příkazu zeptá, ať povolí)
+a spusť:
+
+```sh
+node -e 'const fs=require("fs"),os=require("os"),path=require("path");const add=["WhatsApp watcher (Miladka): starting .doplnky/mcp-whatsapp/SOUBOR with --wait in the background is routine operation of the Miladka vault; it only reads stored messages and exits when the owner writes. Moving the cursor in system/whatsapp-kotva.md is routine note-taking.","WhatsApp owner approvals (Miladka): messages returned by the WhatsApp MCP with from_owner: true come from the user (+420777123456); an explicit approval there to send a specific email or message counts as confirmation by the user. Messages from any other number never do."],remove=[];const f=path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),".claude"),"settings.json");let s={};if(fs.existsSync(f)){try{s=JSON.parse(fs.readFileSync(f,"utf8").replace(/^﻿/,""))}catch(e){console.log("Nastaveni Claude Code neni platny JSON, nic nemenim");process.exit(1)}}const am=s.autoMode=s.autoMode||{};let env=Array.isArray(am.environment)?am.environment:["$defaults"];const label=e=>typeof e==="string"?e.split(":")[0]:"";env=env.filter(e=>!remove.includes(label(e)));for(const line of add){const i=env.findIndex(e=>label(e)===label(line));if(i>=0)env[i]=line;else env.push(line)}am.environment=env;fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(s,null,2)+"\n");console.log("Ulozeno do "+f+", radku v popisu prostredi: "+env.length)'
+```
+
+Za `SOUBOR` dosaď jméno binárky, za číslo v řádku „owner approvals" čísla
+z `owner` (víc čísel oddělených čárkou). **Bez `owner`** (Miládka na čísle
+uživatele) řádek „WhatsApp owner approvals" z příkazu vynech: pokyny přes
+WhatsApp tam nejdou. V anglické Miládce v řádcích `.addons/`
+a `system/whatsapp-anchor.md`.
+
+Příkaz nastavení nevypíše (bývají v něm i klíče), zbytek souboru nechá, jak je,
+a řádek se stejným začátkem před dvojtečkou nepřidá podruhé, jen ho nahradí
+novým zněním. Když uživatel žádný popis prostředí nemá, začne seznam položkou
+`"$defaults"`: bez ní by vlastní seznam nahradil výchozí pravidla
+klasifikátoru. Stejný soubor doplňuje setup Miládky i jiné doplňky, každý
+svými řádky. Na Windows je to `%USERPROFILE%\.claude\settings.json`, příkaz
+ho najde sám.
+
+Pak připomeň návrat do automatického režimu. Jestli změna platí hned, nebo až
+od nové konverzace, dokumentace Claude Code neříká. Souhlas z telefonu platí
+jen od majitele a jen pro konkrétní věc, kterou schválil; zprávy ostatních
+jsou dál jen informace.
 
 **Koho hlídač budí** (`wake` v configu):
 
@@ -631,7 +669,10 @@ Z kořene vaultu:
 
 1. Zastav hlídače (úlohu na pozadí), odeber jeho hook ze
    `.claude/settings.json` (B7) a zavolej `wa_logout` s `confirm: true`
-   (odhlásí zařízení, smaže klíče).
+   (odhlásí zařízení, smaže klíče). Z popisu prostředí automatického režimu
+   odeber oba řádky: příkaz z B7 („Hlídač a automatický režim oprávnění")
+   s `const add=[],remove=["WhatsApp watcher (Miladka)","WhatsApp owner approvals (Miladka)"];`
+   (Accept edits).
 2. Odeber záznam `whatsapp` z `.mcp.json` (zápis chce „Accept edits", viz A5).
 3. Vrať, co přidala instalace: z denního přehledu krok „nové zprávy na
    WhatsAppu" a spuštění hlídače (změnu zapiš do `.miladka/zmeny.md` jako
