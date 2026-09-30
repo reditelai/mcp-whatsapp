@@ -402,7 +402,9 @@ tohohle řádku ho nespustíš, dokud to nevyřešíte. Když ho znovu spustíš
 zavření aplikace). Aby se na nové spuštění nezapomnělo, přidej při nastavení
 do `.claude/settings.json` ve vaultu hook při startu konverzace. Sekce
 `SessionStart` se slučuje: do existujícího pole (bývá v něm hook denního
-přehledu) přidej položku navíc, **nikdy nepřepisuj celý soubor**:
+přehledu) přidej položku navíc, **nikdy nepřepisuj celý soubor**. Když už
+máš vlastní hook, který ti spuštění hlídače WhatsAppu připomíná, druhý
+nepřidávej, jinak dostaneš pokyn dvakrát:
 
 ```json
 {

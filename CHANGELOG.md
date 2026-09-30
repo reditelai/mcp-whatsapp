@@ -5,6 +5,16 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.1.4] - 2026-09-30
+
+Návod B7: druhý hook při startu konverzace nepřidávat, když ho uživatel už má vlastní.
+
+- Kdo měl pokyn ke spuštění hlídače už ve vlastním hooku (Věrka od 0.3.0), dostal ho po aktualizaci na 1.1.2 dvakrát.
+
+### Při aktualizaci
+
+- Když máš pokyn ke spuštění hlídače WhatsAppu ve vlastním hooku i v hooku z návodu B7, jeden z nich odeber.
+
 ## [1.1.3] - 2026-09-30
 
 Převzatý hlídač se už nevzbudí na tutéž zprávu podruhé.
