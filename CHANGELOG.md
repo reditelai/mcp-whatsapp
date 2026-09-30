@@ -5,6 +5,8 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+- Návod B7, „Hlídač a automatický režim oprávnění": změna popisu prostředí platí hned, v téže konverzaci (ověřeno 30. 9. 2026).
+
 ## [1.2.1] - 2026-09-30
 
 Automatický režim oprávnění už nemá zastavovat hlídač ani odmítat souhlas majitele z telefonu: návod doplní dva řádky do popisu prostředí.

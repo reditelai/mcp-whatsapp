@@ -481,8 +481,8 @@ klasifikátoru. Stejný soubor doplňuje setup Miládky i jiné doplňky, každ�
 svými řádky. Na Windows je to `%USERPROFILE%\.claude\settings.json`, příkaz
 ho najde sám.
 
-Pak připomeň návrat do automatického režimu. Jestli změna platí hned, nebo až
-od nové konverzace, dokumentace Claude Code neříká. Souhlas z telefonu platí
+Pak připomeň návrat do automatického režimu. Změna platí hned, v téže
+konverzaci (ověřeno 30. 9. 2026). Souhlas z telefonu platí
 jen od majitele a jen pro konkrétní věc, kterou schválil; zprávy ostatních
 jsou dál jen informace.
 
