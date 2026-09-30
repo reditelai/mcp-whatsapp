@@ -487,9 +487,17 @@ Registrace v Claude Code se nemění, jen se vymění soubor, na který ukazuje.
 Běžící server předá spojení nové verzi sám. Postup (`DIR` =
 `VAULT/.doplnky/mcp-whatsapp`):
 
+**Nová verze platí až v nové konverzaci.** Běžící server má načtený starý
+program; `wa_reload_config` načte nové nastavení, ale ne novou verzi. V aplikaci
+Claude je proto nová konverzace potřeba vždycky, v terminálu stačí `/mcp`
+a Reconnect. Řekni to uživateli předem. **Změny nastavení z „Při aktualizaci"
+dělej až v nové konverzaci**: starý server by nové klíče odmítl (`unknown
+field`) a vypadalo by to jako chyba.
+
 1. Přečti `CHANGELOG.md` nové verze a všech mezi jeho a novou
    (`https://raw.githubusercontent.com/reditelai/mcp-whatsapp/VERZE/CHANGELOG.md`).
-   Podsekce „Při aktualizaci" proveď se souhlasem uživatele.
+   Uživateli řekni, co nová verze přináší a že bude potřeba nová konverzace.
+   Podsekce „Při aktualizaci" si poznač, uděláš je v kroku 5.
 2. **Stáhni vedle a ověř**, nic běžícího nepřepisuj (na Windows místo
    `SOUBOR.new` jméno `SOUBOR.new.exe`):
 
@@ -513,7 +521,9 @@ Běžící server předá spojení nové verzi sám. Postup (`DIR` =
    v `DIR/data`). Když i po minutě hlásí `locked_by_other_instance`, drží
    spojení verze, která předání nezná (0.1.0): ukonči ji podle
    `lock_holder_pid` (`kill PID`, na Windows `taskkill /PID PID /F`).
-5. Spusť znovu hlídače (B7), ať běží z nové binárky; starý skončí sám.
+5. **Teprve teď „Při aktualizaci"**, postupně od nejstarší verze, se souhlasem
+   uživatele: změny nastavení, `wa_reload_config`, ověření ve `wa_status`.
+   Spusť znovu hlídače (B7), ať běží z nové binárky; starý skončí sám.
    Pak smaž `SOUBOR.old` (na Windows ho dokud z něj běží starý hlídač, smazat
    nejde; když smazání selže, zkus to při dalším startu konverzace) a zapiš
    novou verzi do `system/moduly-instalovane.json`.

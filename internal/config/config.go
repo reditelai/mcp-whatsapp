@@ -136,6 +136,12 @@ func parseWith(data []byte, path, bin string) (*Config, error) {
 	dec.DisallowUnknownFields()
 	var raw rawConfig
 	if err := dec.Decode(&raw); err != nil {
+		// Most often a key of a newer version, written while the old one still
+		// runs: a new version applies only in a new conversation (Věrka's
+		// update of the mail server to 1.3.0, 30. 9. 2026).
+		if strings.Contains(err.Error(), "unknown field") {
+			return nil, fmt.Errorf("%s není platná konfigurace: %v. Když ten klíč patří novější verzi serveru, běží ještě ta starší: nová verze platí až v nové konverzaci (v terminálu po /mcp a Reconnect). Jinak je to překlep", path, err)
+		}
 		return nil, fmt.Errorf("%s není platná konfigurace: %v", path, err)
 	}
 

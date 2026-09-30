@@ -5,6 +5,17 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.1.5] - 2026-09-30
+
+Aktualizace ve správném pořadí: nová verze platí až v nové konverzaci, změny nastavení se dělají až potom.
+
+- Návod B5: předem říct, že nová verze potřebuje novou konverzaci (v terminálu `/mcp` a Reconnect), a změny nastavení z „Při aktualizaci" dělat až v ní. Starý server nové klíče odmítne, což vypadá jako chyba (Věrka při aktualizaci multigmailu na 1.3.0).
+- Neznámý klíč v `config.json` hláška vysvětlí: nejspíš patří novější verzi a běží ještě stará, jinak je to překlep.
+
+### Při aktualizaci
+
+- Nastavení se nemění. Po nové konverzaci spusť hlídače znovu (B7), ať běží z nové verze.
+
 ## [1.1.4] - 2026-09-30
 
 Návod B7: druhý hook při startu konverzace nepřidávat, když ho uživatel už má vlastní.
