@@ -385,6 +385,12 @@ Běží vždycky jen jeden: když spustíš nový, starý skončí sám.
 
 Když ho zastavíš sama, na přání uživatele, znovu ho nespouštěj.
 
+**Zastavený hlídač si zapiš.** Když ho necháš stát (kód 5, nebo na přání
+uživatele), připiš do `system/whatsapp-kotva.md` řádek `Hlídač: zastavený
+(důvod, datum)`. Hook při startu konverzace ti pak hlídače připomene, ale podle
+tohohle řádku ho nespustíš, dokud to nevyřešíte. Když ho znovu spustíš,
+řádek smaž.
+
 **Vyřízení s co nejmíň kroky.** Každý krok tě stojí celou konverzaci znovu:
 
 1. `wa_new_messages` s kurzorem (postup B1).

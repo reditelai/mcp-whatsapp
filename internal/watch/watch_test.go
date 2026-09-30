@@ -189,8 +189,32 @@ func TestNewerWatcherTakesOver(t *testing.T) {
 		t.Fatalf("first: %d %q", code, out)
 	}
 	second()
-	if _, err := os.Stat(claim); !os.IsNotExist(err) {
-		t.Fatalf("claim left behind: %v", err)
+	// The claim stays: an older watcher must not read a missing file as its own.
+	if _, err := os.Stat(claim); err != nil {
+		t.Fatalf("claim removed: %v", err)
+	}
+}
+
+func TestReplacedStaysReplaced(t *testing.T) {
+	e := newEnv(t, "")
+	first := e.run(e.cursor(), 5*time.Second)
+	claim := claimPath(e.cfg.DataDir)
+	for i := 0; ; i++ {
+		if _, err := os.Stat(claim); err == nil {
+			break
+		}
+		if i > 500 {
+			t.Fatal("first watcher did not start")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	// A newer watcher claims and is already done before the first looks again.
+	if err := os.WriteFile(claim, []byte("newer, already finished"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e.save("late", owner, "text", false, "")
+	if code, out := first(); code != ExitReplaced {
+		t.Fatalf("old watcher woke: %d %q", code, out)
 	}
 }
 

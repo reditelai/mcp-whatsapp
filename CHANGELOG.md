@@ -5,6 +5,17 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.1.3] - 2026-09-30
+
+Převzatý hlídač se už nevzbudí na tutéž zprávu podruhé.
+
+- Hlídač při konci nemaže soubor `wait.owner`. Dřív ho novější hlídač, který skončil hned, smazal a starší to vzal jako „pořád můj", takže se na tutéž zprávu probudili oba. Chybu našla revize hlídače pošty v multigmailu, u WhatsAppu byla stejná.
+- Návod B7: zastavený hlídač (kód 5 nebo na přání uživatele) se zapíše do kotvy, ať ho hook při startu konverzace nespouští, dokud se problém nevyřeší.
+
+### Při aktualizaci
+
+- Nastavení se nemění. Po výměně binárky spusť znovu hlídače (B7), ať běží z nové verze.
+
 ## [1.1.2] - 2026-09-30
 
 Hlídač naběhne v každé nové konverzaci: návod přidává hook při startu konverzace, který asistentovi připomene hlídače spustit.

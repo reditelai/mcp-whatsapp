@@ -107,11 +107,10 @@ func Run(ctx context.Context, cfg *config.Config, cursor int64, o Options, out i
 	if err != nil {
 		return say(ExitUsage, "chyba: nejde zapsat %s: %v", claim, err)
 	}
-	defer func() {
-		if b, err := os.ReadFile(claim); err == nil && string(b) == token {
-			_ = os.Remove(claim)
-		}
-	}()
+	// The claim stays in place on exit, on purpose: an older watcher that found
+	// it gone would take that as "still mine" and wake on the same message a
+	// second time (found in the review of the mail watcher, 30. 9. 2026). The
+	// next watcher simply writes its own token over it.
 	ppid := os.Getppid()
 	again := "Spusť hlídače znovu se stejným kurzorem " + strconv.FormatInt(cursor, 10) + "."
 	started := time.Now()
