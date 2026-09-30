@@ -272,7 +272,8 @@ vytvořením kódu a jeho zobrazením ubírá uživateli čas na naskenování.
 - Když má denní přehled, přidej do jeho postupu krok „nové zprávy na
   WhatsAppu" (část B) a hned po něm spuštění hlídače (B7). Udělej generálku
   jako u jiných změn přehledu.
-- **Spusť hlídače** podle B7.
+- **Spusť hlídače** podle B7 a **přidej jeho hook při startu konverzace**
+  (B7, „Hlídač v každé konverzaci"), ať naběhne i v každé další konverzaci.
 
 ### A8. Přepis hlasovek
 
@@ -363,8 +364,9 @@ kratší `timeout`, přidej `--max` o 5 minut kratší (třeba `--max 25m`).
 Spouštíš ho:
 
 - po nastavení (A7),
-- na začátku každé konverzace, v denním přehledu hned po kroku „nové zprávy
-  na WhatsAppu" (když se aplikace zavře, hlídač skončí s ní),
+- **v každé nové a obnovené konverzaci**, s první zprávou uživatele: připomene
+  ti to hook (níž, „Hlídač v každé konverzaci"),
+- v denním přehledu hned po kroku „nové zprávy na WhatsAppu",
 - po každém vyřízení zpráv, s novým kurzorem (níž).
 
 Běží vždycky jen jeden: když spustíš nový, starý skončí sám.
@@ -389,6 +391,32 @@ Když ho zastavíš sama, na přání uživatele, znovu ho nespouštěj.
 2. Udělej, co zpráva chce, a zapiš, co z ní vzešlo.
 3. **Najednou v jednom kroku:** odpověď majiteli (`wa_send_text` do stejného
    chatu), nový kurzor do kotvy a nové spuštění hlídače s tímhle kurzorem.
+
+**Hlídač v každé konverzaci.** Proces na pozadí skončí s konverzací (a po
+zavření aplikace). Aby se na nové spuštění nezapomnělo, přidej při nastavení
+do `.claude/settings.json` ve vaultu hook při startu konverzace. Sekce
+`SessionStart` se slučuje: do existujícího pole (bývá v něm hook denního
+přehledu) přidej položku navíc, **nikdy nepřepisuj celý soubor**:
+
+```json
+{
+  "matcher": "startup|resume|clear",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "echo 'Hlidac WhatsAppu v teto konverzaci nebezi. S prvni zpravou uzivatele ho spust podle navodu mcp-whatsapp B7 (kurzor v system/whatsapp-kotva.md) a teprve potom reaguj na zpravu.'",
+      "timeout": 5
+    }
+  ]
+}
+```
+
+V anglické Miládce kotva `system/whatsapp-anchor.md`. Hook hlídače sám
+nespustí a konverzaci neprobudí. Připomene ti to, až uživatel napíše první
+zprávu (ranní přehled z cronu přijde sám a hlídače spustí taky). Uživateli řekni
+jednou větou, že hlídání naběhne s první zprávou v nové konverzaci nebo
+s ranním přehledem. Zápis do `.claude/settings.json` může zablokovat
+automatický režim oprávnění: požádej o dočasné „Accept edits" jako v A5.
 
 **Koho hlídač budí** (`wake` v configu):
 
@@ -502,7 +530,8 @@ Když cokoli selže, vrať `SOUBOR.old` na původní jméno a řekni to uživate
 
 ### B6. Odpojení
 
-1. Zastav hlídače (úlohu na pozadí) a zavolej `wa_logout` s `confirm: true`
+1. Zastav hlídače (úlohu na pozadí), odeber jeho hook ze
+   `.claude/settings.json` (B7) a zavolej `wa_logout` s `confirm: true`
    (odhlásí zařízení, smaže klíče).
 2. Odeber záznam `whatsapp` z `.mcp.json` (zápis chce „Accept edits", viz A5).
 3. Vrať, co přidala instalace: z denního přehledu krok „nové zprávy na

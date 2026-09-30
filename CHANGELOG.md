@@ -5,6 +5,17 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.1.2] - 2026-09-30
+
+Hlídač naběhne v každé nové konverzaci: návod přidává hook při startu konverzace, který asistentovi připomene hlídače spustit.
+
+- Návod B7: hook `SessionStart` (nová, obnovená i vyčištěná konverzace) v `.claude/settings.json`. Hlídač na pozadí skončí s konverzací a dřív se znovu spustil až s denním přehledem, takže druhá konverzace téhož dne zůstala bez hlídání.
+
+### Při aktualizaci
+
+- Se souhlasem uživatele přidej hook podle návodu B7, „Hlídač v každé konverzaci", do `.claude/settings.json` (slučovat, nepřepisovat; může chtít „Accept edits").
+- Po výměně binárky spusť znovu hlídače (B7), ať běží z nové verze.
+
 ## [1.1.1] - 2026-09-30
 
 Změnu nastavení jde ověřit: `wa_status` a `wa_reload_config` ukazují, co teď platí.
