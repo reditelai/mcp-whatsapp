@@ -65,7 +65,7 @@ func (m *Manager) CanonicalChat(ctx context.Context, chat types.JID) (types.JID,
 // CanRead reports whether a chat may be read, after resolving LIDs.
 func (m *Manager) CanRead(ctx context.Context, chat types.JID) (types.JID, bool) {
 	c, phone := m.CanonicalChat(ctx, chat)
-	return c, m.pol.CanRead(c, phone)
+	return c, m.policy().CanRead(c, phone)
 }
 
 func (m *Manager) sendTarget(ctx context.Context, chat string) (types.JID, error) {
@@ -74,7 +74,7 @@ func (m *Manager) sendTarget(ctx context.Context, chat string) (types.JID, error
 		return types.JID{}, err
 	}
 	c, phone := m.CanonicalChat(ctx, jid)
-	if !m.pol.CanSend(c, phone) {
+	if !m.policy().CanSend(c, phone) {
 		return types.JID{}, ErrSendForbidden
 	}
 	return c, nil
@@ -215,7 +215,7 @@ func (m *Manager) SendFile(ctx context.Context, chat, path, caption string) (*Se
 // allowedFile checks that path is inside one of send.files and not inside
 // the data folder (session keys must never leave).
 func (m *Manager) allowedFile(path string) (string, error) {
-	if len(m.cfg.Send.FileDirs) == 0 {
+	if len(m.conf().Send.FileDirs) == 0 {
 		return "", fmt.Errorf("%w: sending files is off (no folders in send.files)", ErrSendForbidden)
 	}
 	abs, err := filepath.Abs(path)
@@ -225,10 +225,10 @@ func (m *Manager) allowedFile(path string) (string, error) {
 	if real, err := filepath.EvalSymlinks(abs); err == nil {
 		abs = real
 	}
-	if within(abs, m.cfg.DataDir) || secretPath(abs) {
+	if within(abs, m.conf().DataDir) || secretPath(abs) {
 		return "", fmt.Errorf("%w: files from the server data folder, add-on folders or secrets cannot be sent", ErrSendForbidden)
 	}
-	for _, d := range m.cfg.Send.FileDirs {
+	for _, d := range m.conf().Send.FileDirs {
 		if within(abs, d) {
 			return abs, nil
 		}

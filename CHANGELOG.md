@@ -5,6 +5,17 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.1.0] - 2026-09-30
+
+Změna nastavení bez nové konverzace: nový nástroj `wa_reload_config` načte `config.json` za běhu.
+
+- `wa_reload_config`: po změně nastavení (se souhlasem uživatele) ho server načte hned. Uplatní čtení, odesílání, majitele, buzení, mazání médií, historii a přepis; složky a jméno zařízení dál až po nové konverzaci. Soubor s chybou nezmění nic. Aplikace Claude na Windows server znovu připojit neumí, takže každá změna dřív chtěla novou konverzaci.
+- Návod B6 (odpojení): nejdřív zastavit hlídače a server (nová konverzace, na Windows jinak soubory smazat nejde), smazat i stažená média a nastavení, vrátit krok v denním přehledu, kotvu a zápis ve stavu Miládky (test na Windows 30. 9.).
+
+### Při aktualizaci
+
+- Nastavení se nemění. Po výměně binárky spusť znovu hlídače (B7), ať běží z nové verze.
+
 ## [1.0.0] - 2026-09-30
 
 Stabilní verze: Miládka provede WhatsAppem i netechnického uživatele a od teď se nástroje a klíče nastavení mění jen s novou hlavní verzí.

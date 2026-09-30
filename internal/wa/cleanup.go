@@ -11,11 +11,10 @@ import (
 // app.db) and only inside media_dir; the message text and the transcript
 // stay. What should be kept, Miládka moves elsewhere (zdroje/) before.
 func (m *Manager) cleanMedia(ctx context.Context) {
-	if m.cfg.MediaKeep == 0 {
-		return
-	}
 	for {
-		m.cleanMediaOnce(ctx)
+		if m.conf().MediaKeep > 0 { // 0 = keep forever; can change at a reload
+			m.cleanMediaOnce(ctx)
+		}
 		select {
 		case <-ctx.Done():
 			return
@@ -25,7 +24,8 @@ func (m *Manager) cleanMedia(ctx context.Context) {
 }
 
 func (m *Manager) cleanMediaOnce(ctx context.Context) {
-	before := time.Now().AddDate(0, 0, -m.cfg.MediaKeep)
+	cfg := m.conf()
+	before := time.Now().AddDate(0, 0, -cfg.MediaKeep)
 	removed := 0
 	// A file that cannot be removed now (open in a viewer, held by antivirus
 	// or a sync client, typical on Windows) stays for the next day's run;
@@ -44,7 +44,7 @@ func (m *Manager) cleanMediaOnce(ctx context.Context) {
 				continue
 			}
 			progress = true
-			if within(msg.MediaPath, m.cfg.MediaDir) || within(msg.MediaPath, m.cfg.DataDir) {
+			if within(msg.MediaPath, cfg.MediaDir) || within(msg.MediaPath, cfg.DataDir) {
 				if err := os.Remove(msg.MediaPath); err == nil {
 					removed++
 				} else if !os.IsNotExist(err) {
@@ -61,6 +61,6 @@ func (m *Manager) cleanMediaOnce(ctx context.Context) {
 		}
 	}
 	if removed > 0 {
-		m.log.Infof("media cleanup: removed %d files older than %d days", removed, m.cfg.MediaKeep)
+		m.log.Infof("media cleanup: removed %d files older than %d days", removed, cfg.MediaKeep)
 	}
 }

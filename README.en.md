@@ -48,6 +48,9 @@ The server links to the WhatsApp account that scans the QR code.
   the assistant when you write. Waiting costs no tokens.
 - **Voice notes transcribed right on your computer.** Nothing leaves it. The
   model is downloaded once (about 510 MB), when you agree to it.
+- **Changing the settings without a new conversation:** after editing
+  `config.json` the assistant calls `wa_reload_config` and the server loads it
+  right away.
 - **Readable state:** an outdated client, a logout from the phone, a network
   outage or the connection held by another conversation show up as different
   states.

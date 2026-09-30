@@ -434,8 +434,15 @@ diakritiku). Starší zprávy, než je spárování, tam nejsou, pokud není
 
 ### B4. Změna nastavení
 
-Změnu `config.json` udělej jen se souhlasem uživatele, zkontroluj `--check`
-a řekni mu, že platí od nové konverzace (server se načte znovu).
+Změnu `config.json` udělej jen se souhlasem uživatele a zkontroluj ji
+`--check`. Pak zavolej **`wa_reload_config`**: server nastavení načte hned,
+bez nové konverzace. Výsledek říká, co se uplatnilo (`applied`) a co platí
+až od nové konverzace (`needs_new_conversation`: složky a jméno zařízení);
+to druhé uživateli řekni. Když je v souboru chyba, nezmění se nic a chyba
+řekne proč. Nakonec spusť znovu hlídače (B7), ať běží s novým nastavením.
+
+Zápis do `.miladka/secrets/` může zablokovat automatický režim oprávnění;
+pak požádej o dočasné „Accept edits" jako v A5.
 
 ### B5. Aktualizace
 
@@ -484,9 +491,20 @@ Když cokoli selže, vrať `SOUBOR.old` na původní jméno a řekni to uživate
 
 ### B6. Odpojení
 
-1. `wa_logout` s `confirm: true` (odhlásí zařízení, smaže klíče).
-2. Odeber záznam `whatsapp` z `.mcp.json`.
-3. Se souhlasem uživatele smaž `VAULT/.doplnky/mcp-whatsapp/` i s uloženými
-   zprávami. `VAULT/.doplnky/prepis/` smaž jen tehdy, když ho nepoužívá jiný
-   doplněk (`system/moduly-instalovane.json`).
-4. Odeber záznam `whatsapp` ze `system/moduly-instalovane.json`.
+1. Zastav hlídače (úlohu na pozadí) a zavolej `wa_logout` s `confirm: true`
+   (odhlásí zařízení, smaže klíče).
+2. Odeber záznam `whatsapp` z `.mcp.json` (zápis chce „Accept edits", viz A5).
+3. Vrať, co přidala instalace: z denního přehledu krok „nové zprávy na
+   WhatsAppu" a spuštění hlídače (změnu zapiš do `.miladka/zmeny.md` jako
+   jiné změny pravidel), `system/whatsapp-kotva.md` a co jsi o WhatsAppu
+   zapsala do `.miladka/stav.md`.
+4. Požádej uživatele o novou konverzaci. Server musí přestat běžet: na
+   Windows jinak jeho databázi a binárku smazat nejde.
+5. V nové konverzaci se souhlasem uživatele smaž:
+   - `VAULT/.doplnky/mcp-whatsapp/` i s uloženými zprávami,
+   - `VAULT/vstupy/whatsapp/` se staženými médii (co chce zachovat, nejdřív
+     přesuň do `zdroje/`),
+   - `VAULT/.miladka/secrets/whatsapp/`,
+   - `VAULT/.doplnky/prepis/` jen tehdy, když ho nepoužívá jiný doplněk
+     (`system/moduly-instalovane.json`).
+6. Odeber záznam `whatsapp` ze `system/moduly-instalovane.json`.

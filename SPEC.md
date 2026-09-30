@@ -104,8 +104,14 @@ zařízením se navzájem shazují. Proto:
   30. 9. 2026).
 - **`device_name`**: jak se zařízení jmenuje v telefonu v Propojených
   zařízeních.
-- Konfigurace se čte při startu. **Asistent ji nemění sám**, jen se souhlasem
-  uživatele, a změna platí od nové konverzace (server se spustí znovu).
+- Konfigurace se čte při startu a znovu nástrojem **`wa_reload_config`**
+  (1.1): aplikace Claude na Windows server znovu připojit neumí a každá změna
+  by jinak chtěla novou konverzaci (Karel 30. 9. 2026). Za běhu se mění
+  `read`, `send`, `owner`, `wake`, `media_keep_days`, historie a přepis;
+  složky (`data_dir`, `media_dir`, `transcription.dir`) a `device_name` až
+  po novém startu, pod běžícím serverem se data nesmí přesunout. Soubor
+  s chybou nezmění nic. **Asistent config nemění sám**, jen se souhlasem
+  uživatele.
 - Nad konfigurací platí pravidla asistenta: Miládka odešle jen zprávu, kterou
   jí uživatel v rozhovoru výslovně řekl odeslat. Konfigurace říká komu, pravidla
   kdy.
@@ -181,6 +187,7 @@ zařízením se navzájem shazují. Proto:
 | `wa_pair` | spárování QR kódem, nebo kódem k opsání |
 | `wa_logout` | odhlásí zařízení a smaže klíče; chce `confirm: true` |
 | `wa_reconnect` | spojení znovu, třeba po `replaced` |
+| `wa_reload_config` | znovu načte `config.json` za běhu, bez nové konverzace (1.1) |
 | `wa_list_chats` | chaty, které smí číst, s posledním časem a počtem zpráv |
 | `wa_get_messages` | zprávy jednoho chatu, od nejnovějších, stránkovaně |
 | `wa_new_messages` | nové zprávy od kurzoru napříč povolenými chaty |

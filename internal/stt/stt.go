@@ -146,6 +146,36 @@ func (e *Engine) installed() bool {
 	return true
 }
 
+func (e *Engine) options() (threads, batch int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.threads, e.batch
+}
+
+// Configure applies transcription settings changed at a config reload. It
+// reports whether the engine became ready (voice notes waiting for a
+// transcript can then be queued).
+func (e *Engine) Configure(enabled bool, threads, batch int) (becameReady bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.threads, e.batch = threads, batch
+	switch {
+	case !enabled && e.state != StateInstalling:
+		e.state, e.errText, e.progress = StateOff, "", ""
+	case enabled && e.state == StateOff:
+		switch {
+		case engines[platform()].url == "":
+			e.state = StateUnsupported
+		case e.installed():
+			e.state = StateReady
+			return true
+		default:
+			e.state = StateNotInstalled
+		}
+	}
+	return false
+}
+
 // Status returns the current state.
 func (e *Engine) Status() Status {
 	e.mu.Lock()
@@ -393,13 +423,14 @@ func (e *Engine) Transcribe(ctx context.Context, oggPath string) (string, error)
 		files = append(files, p)
 	}
 
+	threads, batch := e.options()
 	var parts []string
-	for start := 0; start < len(files); start += e.batch {
-		end := start + e.batch
+	for start := 0; start < len(files); start += batch {
+		end := start + batch
 		if end > len(files) {
 			end = len(files)
 		}
-		texts, err := e.runEngine(ctx, files[start:end])
+		texts, err := e.runEngine(ctx, files[start:end], threads)
 		if err != nil {
 			return "", err
 		}
@@ -408,10 +439,10 @@ func (e *Engine) Transcribe(ctx context.Context, oggPath string) (string, error)
 	return strings.TrimSpace(strings.Join(parts, " ")), nil
 }
 
-func (e *Engine) runEngine(ctx context.Context, wavs []string) ([]string, error) {
+func (e *Engine) runEngine(ctx context.Context, wavs []string, threads int) ([]string, error) {
 	m := e.modelDir()
 	args := []string{
-		fmt.Sprintf("--num-threads=%d", e.threads),
+		fmt.Sprintf("--num-threads=%d", threads),
 		"--encoder=" + filepath.Join(m, "encoder.int8.onnx"),
 		"--decoder=" + filepath.Join(m, "decoder.int8.onnx"),
 		"--joiner=" + filepath.Join(m, "joiner.int8.onnx"),

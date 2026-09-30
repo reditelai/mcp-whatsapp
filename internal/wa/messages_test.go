@@ -122,3 +122,50 @@ func TestSecretPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestReloadConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	write := func(body string) {
+		if err := os.WriteFile(path, []byte(`{"data_dir":"`+filepath.ToSlash(dir)+`"`+body+`}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(`,"read":{"chats":["+420777000111"]},"owner":["+420777000111"]`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := NewManager(cfg, NewLogger(LevelError))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.st.Close()
+	colleague := types.NewJID("420600000000", types.DefaultUserServer)
+	if _, ok := m.CanRead(context.Background(), colleague); ok {
+		t.Fatal("colleague readable before the change")
+	}
+
+	write(`,"read":{"chats":["+420777000111","+420600000000"]},"owner":["+420777000111"],"wake":["+420600000000"],"device_name":"Jiná"`)
+	applied, restart, err := m.ReloadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := m.CanRead(context.Background(), colleague); !ok {
+		t.Fatal("new read scope not applied")
+	}
+	if m.Config().Wake != "list" || m.Config().DeviceName != "Miládka" {
+		t.Fatalf("wake applied, device name kept: %+v", m.Config())
+	}
+	if len(applied) != 2 || applied[0] != "read" || applied[1] != "wake" || len(restart) != 1 || restart[0] != "device_name" {
+		t.Fatalf("applied %v, restart %v", applied, restart)
+	}
+
+	write(`,"read":{"chats":"vse"}`)
+	if _, _, err := m.ReloadConfig(); err == nil {
+		t.Fatal("broken config accepted")
+	}
+	if _, ok := m.CanRead(context.Background(), colleague); !ok {
+		t.Fatal("broken config changed the settings")
+	}
+}

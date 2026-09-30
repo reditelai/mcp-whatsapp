@@ -36,7 +36,7 @@ const (
 )
 
 func (m *Manager) holderPath() string   { return m.lock.Path() + ".pid" }
-func (m *Manager) handoverPath() string { return filepath.Join(m.cfg.DataDir, handoverFileName) }
+func (m *Manager) handoverPath() string { return filepath.Join(m.conf().DataDir, handoverFileName) }
 
 // readHolder reads lock.pid. Version 0.1.0 wrote a bare PID; its version is
 // then unknown ("").

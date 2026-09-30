@@ -119,7 +119,7 @@ func (m *Manager) Pair(ctx context.Context, method, phone string) (*PairResult, 
 	}
 	c.Scale = 8
 	png := c.PNG()
-	path := filepath.Join(m.cfg.DataDir, "pair-qr.png")
+	path := filepath.Join(m.conf().DataDir, "pair-qr.png")
 	if err := os.WriteFile(path, png, 0o600); err != nil {
 		path = ""
 	}

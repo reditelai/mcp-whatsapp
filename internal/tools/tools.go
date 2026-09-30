@@ -60,6 +60,10 @@ func Register(s *server.MCPServer, m *wa.Manager) {
 		mcp.WithDescription("Drop and reopen the WhatsApp connection, e.g. after state replaced once the other program is stopped."),
 	), h.reconnect)
 
+	s.AddTool(mcp.NewTool("wa_reload_config",
+		mcp.WithDescription("Read config.json again and apply it without a new conversation, after the user changed the settings (only with their consent). Applies read, send, owner, wake, media_keep_days, history_sync and transcription; data_dir, media_dir, transcription.dir and device_name still need a new conversation. A config that does not validate changes nothing and the error says why. Restart the --wait watcher afterwards so it uses the new settings."),
+	), h.reloadConfig)
+
 	s.AddTool(mcp.NewTool("wa_list_chats",
 		mcp.WithDescription("Chats the server may read, most recent first, with name, phone, last message time and number of stored messages. The chat field is the id to use in other tools."),
 		mcp.WithString("query", mcp.Description("Filter by name or phone number")),
@@ -270,6 +274,24 @@ func (h *handlers) logout(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 		return fail(err)
 	}
 	return jsonResult(map[string]any{"logged_out": true, "next": "Device unlinked. Pair again with wa_pair when the user wants."})
+}
+
+func (h *handlers) reloadConfig(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	applied, restart, err := h.m.ReloadConfig()
+	if err != nil {
+		return toolError("invalid_config", err.Error()+"\nNothing changed, the previous settings stay."), nil
+	}
+	if applied == nil {
+		applied = []string{}
+	}
+	if restart == nil {
+		restart = []string{}
+	}
+	next := "Restart the --wait watcher (guide B7) so it uses the new settings."
+	if len(restart) > 0 {
+		next += " The keys in needs_new_conversation take effect only in a new conversation."
+	}
+	return jsonResult(map[string]any{"reloaded": true, "applied": applied, "needs_new_conversation": restart, "next": next})
 }
 
 func (h *handlers) reconnect(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {

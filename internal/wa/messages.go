@@ -60,14 +60,14 @@ func (m *Manager) resolveChat(ctx context.Context, cli *whatsmeow.Client, info t
 	kind := policy.Classify(chat)
 	switch kind {
 	case policy.KindGroup:
-		return resolved{jid: chat}, kind, m.pol.CanRead(chat, "")
+		return resolved{jid: chat}, kind, m.policy().CanRead(chat, "")
 	case policy.KindDirect:
 		alt := info.SenderAlt
 		if info.IsFromMe {
 			alt = info.RecipientAlt
 		}
 		r := m.resolvePerson(ctx, cli, chat, alt)
-		return r, kind, m.pol.CanRead(r.jid, r.phone)
+		return r, kind, m.policy().CanRead(r.jid, r.phone)
 	default:
 		return resolved{jid: chat}, kind, false
 	}
@@ -431,7 +431,7 @@ func (m *Manager) onHistorySync(evt *events.HistorySync) {
 		return
 	}
 	var since time.Time
-	if d := m.cfg.HistoryDays; d > 0 {
+	if d := m.conf().HistoryDays; d > 0 {
 		since = time.Now().AddDate(0, 0, -d)
 	}
 	for _, conv := range evt.Data.GetConversations() {
@@ -509,7 +509,7 @@ func (m *Manager) mediaPath(ctx context.Context, msg *appstore.Message) (string,
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(m.cfg.MediaDir, folder)
+	dir := filepath.Join(m.conf().MediaDir, folder)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}

@@ -57,9 +57,13 @@ type Status struct {
 
 // Manager is the single owner of the WhatsApp client in this process.
 type Manager struct {
-	cfg *config.Config
+	// cfg and pol change together when config.json is reloaded
+	// (wa_reload_config); read them through conf() and policy().
+	cfgMu sync.RWMutex
+	cfg   *config.Config
+	pol   *policy.Policy
+
 	log waLog.Logger
-	pol *policy.Policy
 	st  *appstore.Store
 	stt *stt.Engine
 
@@ -110,10 +114,22 @@ func NewManager(cfg *config.Config, log waLog.Logger) (*Manager, error) {
 func (m *Manager) Store() *appstore.Store { return m.st }
 
 // Policy returns the access policy.
-func (m *Manager) Policy() *policy.Policy { return m.pol }
+func (m *Manager) Policy() *policy.Policy { return m.policy() }
 
-// Config returns the loaded config.
-func (m *Manager) Config() *config.Config { return m.cfg }
+// Config returns the current config.
+func (m *Manager) Config() *config.Config { return m.conf() }
+
+func (m *Manager) conf() *config.Config {
+	m.cfgMu.RLock()
+	defer m.cfgMu.RUnlock()
+	return m.cfg
+}
+
+func (m *Manager) policy() *policy.Policy {
+	m.cfgMu.RLock()
+	defer m.cfgMu.RUnlock()
+	return m.pol
+}
 
 func (m *Manager) setState(s State, errText string) {
 	m.mu.Lock()
@@ -128,7 +144,7 @@ func (m *Manager) setState(s State, errText string) {
 func (m *Manager) Status() Status {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	st := Status{State: m.state, Error: m.errText, Since: m.since.UTC().Format(time.RFC3339), DataDir: m.cfg.DataDir}
+	st := Status{State: m.state, Error: m.errText, Since: m.since.UTC().Format(time.RFC3339), DataDir: m.conf().DataDir}
 	if !m.lastEvent.IsZero() {
 		st.LastEventAt = m.lastEvent.UTC().Format(time.RFC3339)
 	}
@@ -208,12 +224,12 @@ func (m *Manager) tryLock() bool {
 }
 
 func (m *Manager) startSession(ctx context.Context) {
-	container, err := sqlstore.New(ctx, "sqlite", appstore.DSN(filepath.Join(m.cfg.DataDir, "session.db")), m.log.Sub("store"))
+	container, err := sqlstore.New(ctx, "sqlite", appstore.DSN(filepath.Join(m.conf().DataDir, "session.db")), m.log.Sub("store"))
 	if err != nil {
 		m.setState(StateError, "Úložiště klíčů (session.db) nejde otevřít: "+err.Error())
 		return
 	}
-	store.SetOSInfo(m.cfg.DeviceName, [3]uint32{0, 1, 0})
+	store.SetOSInfo(m.conf().DeviceName, [3]uint32{0, 1, 0})
 	m.mu.Lock()
 	m.container = container
 	m.mu.Unlock()
@@ -391,7 +407,7 @@ func (m *Manager) handleEvent(evt any) {
 	case *events.Message:
 		m.onMessage(e, false)
 	case *events.HistorySync:
-		if m.cfg.HistorySync {
+		if m.conf().HistorySync {
 			go m.onHistorySync(e)
 		}
 	case *events.PushName:

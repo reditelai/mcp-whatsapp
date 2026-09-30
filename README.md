@@ -45,6 +45,8 @@ Server se propojí s tím WhatsApp účtem, kterým naskenuješ QR kód.
   žádné tokeny.
 - **Přepis hlasovek na text přímo v počítači.** Nic neodchází ven. Model se
   stáhne jednou (asi 510 MB), až k tomu dáš souhlas.
+- **Změna nastavení bez nové konverzace:** asistent po úpravě `config.json`
+  zavolá `wa_reload_config` a server ho načte hned.
 - **Čitelný stav:** zastaralý klient, odhlášení z telefonu, výpadek sítě
   nebo spojení v jiné konverzaci jsou vidět jako různé stavy.
 - **Samo se udržuje:** knihovna whatsmeow se jednou týdně aktualizuje a
