@@ -436,9 +436,10 @@ diakritiku). Starší zprávy, než je spárování, tam nejsou, pokud není
 
 Změnu `config.json` udělej jen se souhlasem uživatele a zkontroluj ji
 `--check`. Pak zavolej **`wa_reload_config`**: server nastavení načte hned,
-bez nové konverzace. Výsledek říká, co se uplatnilo (`applied`) a co platí
-až od nové konverzace (`needs_new_conversation`: složky a jméno zařízení);
-to druhé uživateli řekni. Když je v souboru chyba, nezmění se nic a chyba
+bez nové konverzace. Výsledek říká, co se uplatnilo (`applied`), jaké
+nastavení teď platí (`settings`, porovnej s tím, cos zapsala) a co platí až
+od nové konverzace (`needs_new_conversation`: složky a jméno zařízení); to
+poslední uživateli řekni. Totéž nastavení ukazuje i `wa_status`. Když je v souboru chyba, nezmění se nic a chyba
 řekne proč. Nakonec spusť znovu hlídače (B7), ať běží s novým nastavením.
 
 Zápis do `.miladka/secrets/` může zablokovat automatický režim oprávnění;
@@ -453,13 +454,23 @@ Běžící server předá spojení nové verzi sám. Postup (`DIR` =
 1. Přečti `CHANGELOG.md` nové verze a všech mezi jeho a novou
    (`https://raw.githubusercontent.com/reditelai/mcp-whatsapp/VERZE/CHANGELOG.md`).
    Podsekce „Při aktualizaci" proveď se souhlasem uživatele.
-2. **Stáhni vedle a ověř:** novou binárku a `SHA256SUMS` (A2) do `DIR` pod
-   jménem `SOUBOR.new` (na Windows `SOUBOR.new.exe`), ověř součet a
-   `--version`.
+2. **Stáhni vedle a ověř**, nic běžícího nepřepisuj (na Windows místo
+   `SOUBOR.new` jméno `SOUBOR.new.exe`):
+
+   ```sh
+   cd "DIR"
+   curl -sL -o SOUBOR.new https://github.com/reditelai/mcp-whatsapp/releases/download/VERZE/SOUBOR
+   curl -sL -o SHA256SUMS.new https://github.com/reditelai/mcp-whatsapp/releases/download/VERZE/SHA256SUMS
+   grep " SOUBOR$" SHA256SUMS.new | sed "s/ SOUBOR$/ SOUBOR.new/" | sha256sum -c -
+   chmod +x SOUBOR.new && ./SOUBOR.new --version
+   ```
+
+   Na Macu `shasum -a 256 -c -`. Když součet nesedí, `SOUBOR.new` smaž.
 3. **Vyměň přejmenováním**, ne přepsáním - běžící binárku na Windows přepsat
    nejde, přejmenovat ano:
    - starou přejmenuj na `SOUBOR.old` (Windows `SOUBOR.old.exe`),
-   - novou přejmenuj na původní jméno `SOUBOR`.
+   - novou přejmenuj na původní jméno `SOUBOR`, `SHA256SUMS.new` na
+     `SHA256SUMS`.
 4. **Požádej uživatele o novou konverzaci.** Nová verze se spustí, starou
    požádá o předání a ta se sama odpojí a skončí. V nové konverzaci
    `wa_status`: do pár sekund `connected`, spárování zůstává (klíče jsou

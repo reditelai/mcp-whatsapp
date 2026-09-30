@@ -5,6 +5,18 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.1.1] - 2026-09-30
+
+Změnu nastavení jde ověřit: `wa_status` a `wa_reload_config` ukazují, co teď platí.
+
+- `wa_status` nově ukazuje i mazání médií, složku médií, historii, nastavení přepisu a jméno zařízení (`media_keep_days`, `media_dir`, `history_sync`, `history_days`, `transcription_config`, `device_name`).
+- `wa_reload_config` vrací k seznamu změněných klíčů i nastavení, které teď platí (`settings`), aby asistent ověřil, že se načetlo, co zapsal (Věrka 30. 9.).
+- Návod B5 (aktualizace): přesné příkazy pro stažení nové verze vedle běžící a ověření součtu pod jiným jménem (Věrka 30. 9.).
+
+### Při aktualizaci
+
+- Nastavení se nemění. Po výměně binárky spusť znovu hlídače (B7), ať běží z nové verze.
+
 ## [1.1.0] - 2026-09-30
 
 Změna nastavení bez nové konverzace: nový nástroj `wa_reload_config` načte `config.json` za běhu.

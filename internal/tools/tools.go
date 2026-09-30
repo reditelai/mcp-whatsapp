@@ -16,6 +16,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"go.mau.fi/whatsmeow/types"
 
+	"github.com/reditelai/mcp-whatsapp/internal/config"
 	appstore "github.com/reditelai/mcp-whatsapp/internal/store"
 	"github.com/reditelai/mcp-whatsapp/internal/wa"
 )
@@ -61,7 +62,7 @@ func Register(s *server.MCPServer, m *wa.Manager) {
 	), h.reconnect)
 
 	s.AddTool(mcp.NewTool("wa_reload_config",
-		mcp.WithDescription("Read config.json again and apply it without a new conversation, after the user changed the settings (only with their consent). Applies read, send, owner, wake, media_keep_days, history_sync and transcription; data_dir, media_dir, transcription.dir and device_name still need a new conversation. A config that does not validate changes nothing and the error says why. Restart the --wait watcher afterwards so it uses the new settings."),
+		mcp.WithDescription("Read config.json again and apply it without a new conversation, after the user changed the settings (only with their consent). Applies read, send, owner, wake, media_keep_days, history_sync and transcription; data_dir, media_dir, transcription.dir and device_name still need a new conversation. Returns the changed keys (applied) and the settings now in effect (settings) - check them against what you wrote. A config that does not validate changes nothing and the error says why. Restart the --wait watcher afterwards so it uses the new settings."),
 	), h.reloadConfig)
 
 	s.AddTool(mcp.NewTool("wa_list_chats",
@@ -196,20 +197,36 @@ func parseTime(s string, endOfDay bool) (time.Time, error) {
 
 func (h *handlers) status(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	st := h.m.Status()
-	cfg := h.m.Config()
 	chats, msgs, _ := h.m.Store().Counts(ctx)
-	return jsonResult(map[string]any{
-		"status":          st,
-		"transcription":   h.m.Transcription().Status(),
+	out := settingsSummary(h.m.Config())
+	out["status"] = st
+	out["transcription"] = h.m.Transcription().Status()
+	out["stored_chats"] = chats
+	out["stored_messages"] = msgs
+	return jsonResult(out)
+}
+
+// settingsSummary is what the config allows and sets, for wa_status and
+// wa_reload_config (so that a change can be checked against what was written).
+func settingsSummary(cfg *config.Config) map[string]any {
+	return map[string]any{
 		"read":            scopeSummary(cfg.Read.AllChats, cfg.Read.Chats, cfg.Read.AllGroups, cfg.Read.Groups),
 		"send":            scopeSummary(cfg.Send.AllChats, cfg.Send.Chats, cfg.Send.AllGroups, cfg.Send.Groups),
 		"send_file_dirs":  append([]string{}, cfg.Send.FileDirs...),
 		"owner":           plusAll(cfg.Owners),
 		"wake":            cfg.WakeSummary(),
-		"stored_chats":    chats,
-		"stored_messages": msgs,
-		"config":          cfg.Path,
-	})
+		"media_dir":       cfg.MediaDir,
+		"media_keep_days": cfg.MediaKeep,
+		"history_sync":    cfg.HistorySync,
+		"history_days":    cfg.HistoryDays,
+		"transcription_config": map[string]any{
+			"enabled": cfg.Transcription.Enabled,
+			"threads": cfg.Transcription.Threads,
+			"batch":   cfg.Transcription.Batch,
+		},
+		"device_name": cfg.DeviceName,
+		"config":      cfg.Path,
+	}
 }
 
 func plusAll(phones []string) []string {
@@ -291,7 +308,8 @@ func (h *handlers) reloadConfig(_ context.Context, _ mcp.CallToolRequest) (*mcp.
 	if len(restart) > 0 {
 		next += " The keys in needs_new_conversation take effect only in a new conversation."
 	}
-	return jsonResult(map[string]any{"reloaded": true, "applied": applied, "needs_new_conversation": restart, "next": next})
+	return jsonResult(map[string]any{"reloaded": true, "applied": applied, "needs_new_conversation": restart,
+		"settings": settingsSummary(h.m.Config()), "next": next})
 }
 
 func (h *handlers) reconnect(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
