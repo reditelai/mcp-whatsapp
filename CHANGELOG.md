@@ -5,6 +5,22 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.2.0] - 2026-09-30
+
+Nastavení se zálohuje s Miládkou: patří do `system/whatsapp.json`, ne mezi hesla.
+
+- Návod: nastavení ve `system/whatsapp.json` místo `.miladka/secrets/whatsapp/config.json`. Hesla v něm nejsou, takže se zálohuje s vaultem a kdo přijde o počítač, nemusí ho skládat znovu (Karel 30. 9. 2026).
+- Návod A1: doplněk si sám ověří v `.gitignore` vaultu `.doplnky/` a `vstupy/*` s výjimkou `!vstupy/.gitkeep`, ať nevyloučí soubor z instalátoru Miládky. Nepředpokládá, že to zařídil balíček nebo jiný doplněk.
+- Nový oddíl návodu B5b: přesun nastavení při aktualizaci.
+- Návod B5a: obnova ze zálohy na novém počítači. Nastavení přijde zálohou, spárování a kotva se udělají znovu.
+
+### Při aktualizaci
+
+- Ověř `.gitignore` vaultu podle A1. Starší návod radil celé `vstupy/`, které vylučuje `vstupy/.gitkeep` z instalátoru Miládky: nahraď ho `vstupy/*` a `!vstupy/.gitkeep`.
+- Staré místo nastavení funguje dál. Když binárka leží ve `.doplnky/` a je zapsaná v `.mcp.json`, nabídni přesun podle návodu B5b: **výjimečně hned po výměně souboru (B5, krok 3), ještě před novou konverzací**, ať stačí jedna. Mění `.mcp.json` (cesta za `--config`), takže potřebuje „Accept edits".
+- Po nové konverzaci spusť hlídače s cestou za `--config` z `.mcp.json` (B7).
+- `config.json` ze starších sekcí je po přesunu `system/whatsapp.json`.
+
 ## [1.1.5] - 2026-09-30
 
 Aktualizace ve správném pořadí: nová verze platí až v nové konverzaci, změny nastavení se dělají až potom.

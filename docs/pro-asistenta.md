@@ -35,7 +35,7 @@ Když server ještě nainstalovaný není, čteš tenhle soubor nejspíš z GitH
     s `wake` nastaveným na seznam lidí nebo na `"all"` (dražší); s výchozím
     `"owner"` by nikdy nic neohlásil a hned skončí chybou.
 - **Konfiguraci měníš jen se souhlasem uživatele.** Co smíš číst a kam psát,
-  určuje `config.json`. Chyba `send_forbidden` je jeho nastavení, ne překážka
+  určuje nastavení (`system/whatsapp.json`). Chyba `send_forbidden` je jeho nastavení, ne překážka
   k obejití.
 - **Odesíláš jen to, co ti uživatel v rozhovoru výslovně řekl odeslat.** Platí
   i s `"all"` v konfiguraci.
@@ -58,8 +58,9 @@ mluv jeho jazykem a všude v návodu použij anglické názvy:
 | `system/whatsapp-kotva.md` | `system/whatsapp-anchor.md` |
 | `.miladka/ulohy.md` (denní přehled) | `.miladka/scheduling.md` |
 | `"device_name": "Miládka"` | `"device_name": "Miladka"` |
+| `vstupy/*` a `!vstupy/.gitkeep` v `.gitignore` | `inbox/*` a `!inbox/.gitkeep` |
 
-Beze změny zůstávají `.miladka/secrets/` a `system/moduly-instalovane.json`.
+Beze změny zůstávají `system/whatsapp.json` a `system/moduly-instalovane.json`.
 Přepis hlasovek si server v `.addons/` pojmenuje sám (`.addons/prepis`).
 Výpisy serveru (`--check`, hlídač, chyby v nastavení) jsou česky; uživateli
 je řekni anglicky.
@@ -88,24 +89,42 @@ do skryté podsložky `.doplnky/` v kořeni vaultu (dál `VAULT`):
 VAULT/.doplnky/mcp-whatsapp/     binárka, SHA256SUMS a data (klíče, databáze zpráv)
 VAULT/.doplnky/prepis/           přepis hlasovek, sdílený s dalšími doplňky
 VAULT/vstupy/whatsapp/           fotky, hlasovky a dokumenty ze zpráv, po chatech
-VAULT/.miladka/secrets/whatsapp/ config.json
+VAULT/system/whatsapp.json       nastavení (A4)
 ```
 
 Uživatel pak Miládku přestěhuje nebo zazálohuje jednou složkou. Obsidian
-složky s tečkou nezobrazuje.
+složky s tečkou nezobrazuje. Nastavení se zálohuje s vaultem (hesla v něm
+nejsou), program, klíče a média ne.
 
-**Než cokoli stáhneš, ověř, že `.doplnky/` a `vstupy/` jsou v `.gitignore`
-vaultu.** V `.doplnky` budou klíče k WhatsAppu a ty do zálohy nesmí nikdy,
-`vstupy/` je průchozí složka a média by zálohu nafoukla:
+**Než cokoli stáhneš, ověř, že `.gitignore` vaultu vynechá ze zálohy program
+a média.** V `.doplnky` budou klíče k WhatsAppu a ty do zálohy nesmí nikdy,
+`vstupy/` je průchozí složka a média by zálohu nafoukla. Nespoléhej na to,
+že to zařídil balíček Miládky nebo jiný doplněk, ověř to sama:
 
 ```sh
 cd VAULT && mkdir -p .doplnky && git check-ignore -v .doplnky/x vstupy/x
 ```
 
-Musí vypsat oba řádky. Když některý chybí (nebo vault není v gitu, ale
-záloha se zapnout může), přidej do `VAULT/.gitignore` chybějící `.doplnky/`
-nebo `vstupy/` a ověř znovu. Od verze balíčku, která `.doplnky` zavádí, tam
-oba řádky jsou.
+Musí vypsat oba řádky. Chybějící pravidlo přidej do `VAULT/.gitignore` na
+samostatný řádek a ověř znovu (i když vault v gitu zatím není, záloha se
+zapnout může):
+
+| Ve výpisu chybí | Přidej |
+|---|---|
+| `.doplnky/x` | `.doplnky/` |
+| `vstupy/x` | `vstupy/*` a pod něj `!vstupy/.gitkeep` |
+
+**Nepřidávej pravidlo, které by vynechalo soubory z instalátoru Miládky.**
+Proto `vstupy/*` s výjimkou, ne celé `vstupy/`: prázdný `vstupy/.gitkeep`
+drží složku v záloze, aby po obnově nechyběla. Starší verze návodu radily
+celé `vstupy/`, proto ověř i tohle:
+
+```sh
+git check-ignore -q --no-index vstupy/.gitkeep && echo "vstupy/.gitkeep je vylouceny"
+```
+
+Když to něco vypíše, uprav `.gitignore` tak, aby v něm místo celého
+`vstupy/` bylo `vstupy/*` a pod ním `!vstupy/.gitkeep`.
 
 Zjisti systém:
 
@@ -175,10 +194,10 @@ ukážu." Po jednom pak řeš jen to, co chce jinak. Význam jednotlivých voleb
    doporuč jen posledních pár dní: `"history_sync": true` a `"history_days": 1`
    (posledních 24 hodin). Bez `history_days` uloží všechno, co telefon nabídne.
 
-### A4. `config.json`
+### A4. Nastavení
 
-Patří do `VAULT/.miladka/secrets/whatsapp/config.json` (`.miladka/secrets/`
-je v `.gitignore`, ověř `git check-ignore -v`).
+Patří do `VAULT/system/whatsapp.json` (složku `system/` založ, když chybí).
+Hesla v něm nejsou, takže se zálohuje s vaultem a čteš ho běžně.
 
 ```json
 {
@@ -197,7 +216,7 @@ Cesty v configu se berou **od kořene vaultu**, takže se stěhují s ním.
 binárky (`.doplnky/mcp-whatsapp/data`) a přepis do `.doplnky/prepis`. Zkontroluj ho (z kořene vaultu):
 
 ```sh
-cd VAULT && .doplnky/mcp-whatsapp/SOUBOR --config .miladka/secrets/whatsapp/config.json --check
+cd VAULT && .doplnky/mcp-whatsapp/SOUBOR --config system/whatsapp.json --check
 ```
 
 Výpis říká i datovou složku; musí ležet v `.doplnky/mcp-whatsapp/data`.
@@ -213,7 +232,7 @@ registraci nerozbije):
   "mcpServers": {
     "whatsapp": {
       "command": ".doplnky/mcp-whatsapp/SOUBOR",
-      "args": ["--config", ".miladka/secrets/whatsapp/config.json"]
+      "args": ["--config", "system/whatsapp.json"]
     }
   }
 }
@@ -293,7 +312,7 @@ to je**, bez technických názvů. Třeba:
    `transcription.state` přejde na `ready`.
 3. Když nechce, nic nedělej. Hlasovky dál přijdou jako soubory.
 
-Na slabém stroji (4 GB paměti a méně) navrhni v `config.json`
+Na slabém stroji (4 GB paměti a méně) navrhni v nastavení
 `"transcription": {"batch": 1}`.
 
 ## Část B - provoz
@@ -354,8 +373,11 @@ pozadí zastaví už po 30 minutách), z kořene vaultu, s kurzorem
 z `system/whatsapp-kotva.md`:
 
 ```sh
-.doplnky/mcp-whatsapp/SOUBOR --config .miladka/secrets/whatsapp/config.json --wait --cursor KURZOR
+.doplnky/mcp-whatsapp/SOUBOR --config system/whatsapp.json --wait --cursor KURZOR
 ```
+
+Cesta za `--config` je stejná jako v `.mcp.json` (od verze 1.2
+`system/whatsapp.json`, starší instalace může mít jinou).
 
 V PowerShellu na začátek `& ` a cestu s `\`. Na hlídače nečekej a nic
 dalšího s ním nedělej, ozve se sám. Po necelých 2 hodinách skončí sám
@@ -470,7 +492,7 @@ diakritiku). Starší zprávy, než je spárování, tam nejsou, pokud není
 
 ### B4. Změna nastavení
 
-Změnu `config.json` udělej jen se souhlasem uživatele a zkontroluj ji
+Změnu nastavení (`system/whatsapp.json`) udělej jen se souhlasem uživatele a zkontroluj ji
 `--check`. Pak zavolej **`wa_reload_config`**: server nastavení načte hned,
 bez nové konverzace. Výsledek říká, co se uplatnilo (`applied`), jaké
 nastavení teď platí (`settings`, porovnej s tím, cos zapsala) a co platí až
@@ -478,12 +500,13 @@ od nové konverzace (`needs_new_conversation`: složky a jméno zařízení); to
 poslední uživateli řekni. Totéž nastavení ukazuje i `wa_status`. Když je v souboru chyba, nezmění se nic a chyba
 řekne proč. Nakonec spusť znovu hlídače (B7), ať běží s novým nastavením.
 
-Zápis do `.miladka/secrets/` může zablokovat automatický režim oprávnění;
-pak požádej o dočasné „Accept edits" jako v A5.
+Když zápis zablokuje automatický režim oprávnění, požádej o dočasné „Accept
+edits" jako v A5.
 
 ### B5. Aktualizace
 
-Registrace v Claude Code se nemění, jen se vymění soubor, na který ukazuje.
+Registrace v Claude Code se nemění (kromě přesunu nastavení ve verzi 1.2,
+B5b), jen se vymění soubor, na který ukazuje.
 Běžící server předá spojení nové verzi sám. Postup (`DIR` =
 `VAULT/.doplnky/mcp-whatsapp`):
 
@@ -492,7 +515,8 @@ program; `wa_reload_config` načte nové nastavení, ale ne novou verzi. V aplik
 Claude je proto nová konverzace potřeba vždycky, v terminálu stačí `/mcp`
 a Reconnect. Řekni to uživateli předem. **Změny nastavení z „Při aktualizaci"
 dělej až v nové konverzaci**: starý server by nové klíče odmítl (`unknown
-field`) a vypadalo by to jako chyba.
+field`) a vypadalo by to jako chyba. Výjimku, kterou „Při aktualizaci" řekne
+výslovně (přesun nastavení ve verzi 1.2, B5b), udělej už po kroku 3.
 
 1. Přečti `CHANGELOG.md` nové verze a všech mezi jeho a novou
    (`https://raw.githubusercontent.com/reditelai/mcp-whatsapp/VERZE/CHANGELOG.md`).
@@ -530,21 +554,78 @@ field`) a vypadalo by to jako chyba.
 
 Když cokoli selže, vrať `SOUBOR.old` na původní jméno a řekni to uživateli.
 
-### B5a. Přesun vaultu a nový počítač
+### B5a. Přesun vaultu, nový počítač a obnova ze zálohy
 
 - **Přesun na stejném počítači:** stačí přesunout celou složku vaultu, když
   server neběží (zavřená aplikace). Registrace je relativní, data jdou s ním.
-- **Jiný počítač nebo jiný systém:** binárka je pro konkrétní systém. Podle
-  `system/moduly-instalovane.json` stáhni binárku pro nový systém (A1, A2)
-  do stejné složky, starou smaž. Přepis hlasovek (`.doplnky/prepis`) stáhni
-  znovu přes `wa_transcription_setup`, engine je taky pro konkrétní systém.
-- **Dva počítače zároveň** (vault synchronizovaný zálohou): `.mcp.json` přijde
-  zálohou sám, ale `.doplnky/` se
-  nezálohuje, takže na druhém stroji server nenaběhne, dokud tam nestáhneš
-  binárku (A1, A2). Každý počítač má vlastní instalaci. **Klíče (`data/`) mezi
-  počítači nikdy nekopíruj** - dvě stejná zařízení by se přetahovala. Na
-  druhém počítači spáruj WhatsApp znovu (je to další propojené zařízení),
-  nebo ho nech jen na jednom.
+- **Celá složka i se skrytou `.doplnky/` na jiném systému:** binárka je pro
+  konkrétní systém. Podle `system/moduly-instalovane.json` stáhni binárku pro
+  nový systém (A1, A2) do stejné složky, starou smaž, a v `.mcp.json` přepiš
+  `command` na nové jméno souboru (Accept edits jako v A5). Přepis hlasovek
+  (`.doplnky/prepis`) stáhni znovu přes `wa_transcription_setup`, engine je
+  taky pro konkrétní systém.
+- **Obnova ze zálohy na novém počítači.** Poznáš ji tak, že nastavení
+  `system/whatsapp.json`, kotva a záznam `whatsapp` v `.mcp.json` jsou, ale
+  binárka v `.doplnky/mcp-whatsapp/` chybí: server v `/mcp` nenaběhne a hook
+  hlídače nemá co spustit. Zálohou přišlo nastavení; program, propojení
+  s telefonem (klíče v `data/`), uložené zprávy a média ne. Uživateli řekni
+  jednou větou: „Nastavení WhatsAppu se obnovilo ze zálohy. Propojení
+  s telefonem se nezálohuje, takže kód naskenujete znovu." Pak:
+  1. A1 (`.gitignore`, systém), A2 (poslední verze), kontrola `--check` z A4.
+     Když je nový počítač jiný systém než starý, přepiš v `.mcp.json`
+     `command` na nové jméno souboru (Accept edits jako v A5).
+  2. Nová konverzace, uživatel server povolí (A5), `wa_status` hlásí
+     `not_paired`.
+  3. Spárování (A6). V telefonu přibude nové propojené zařízení; staré
+     „Miládka" ať uživatel v seznamu Propojená zařízení odebere.
+  4. **Kotvu založ znovu** podle A7: starý kurzor patří k databázi, která se
+     nezálohovala, a hlídač by s ním skončil kódem 6. Zprávy z doby před
+     obnovou tu nejsou; když je uživatel chce, `history_sync` (A3, bod 7).
+  5. Přepis hlasovek se souhlasem znovu (A8, stahuje se asi 700 MB), hlídače
+     (B7), verze do `system/moduly-instalovane.json`.
+
+  Záloha z doby před verzí 1.2 nastavení nemá (leželo v `.miladka/secrets/`,
+  které se nezálohuje): nastav WhatsApp znovu od A3 a v `.mcp.json` přepiš
+  cestu za `--config` na `system/whatsapp.json` (záznam už existuje, Accept
+  edits jako v A5).
+- **Dva počítače zároveň** (vault synchronizovaný zálohou) nejsou vyzkoušené.
+  `.doplnky/` se nezálohuje, takže každý počítač potřebuje vlastní instalaci
+  a vlastní spárování (je to další propojené zařízení). **Klíče (`data/`)
+  mezi počítači nikdy nekopíruj** - dvě stejná zařízení by se přetahovala.
+  Kotva se ale zálohou sdílí a kurzor patří k databázi jednoho počítače,
+  proto doporuč WhatsApp jen na jednom.
+
+### B5b. Přesun nastavení do `system/` (verze 1.2)
+
+Do verze 1.1 leželo nastavení v `.miladka/secrets/whatsapp/config.json`, a
+proto se nezálohovalo, i když hesla v něm nejsou. Od 1.2 je v
+`system/whatsapp.json` a zálohuje se s vaultem: kdo přijde o počítač, nemusí
+nastavení skládat znovu. Staré místo funguje dál, přesun je jen se souhlasem
+uživatele; řekni mu jednou větou proč.
+
+**Jen pro instalaci ve složce Miládky:** binárka v `.doplnky/mcp-whatsapp/`,
+zapsaná v `.mcp.json` (A5). Jinak přesun nenabízej, staré místo funguje dál.
+
+**Udělej ho hned po kroku 3 aktualizace, ještě před novou konverzací.** Běžící
+server má nastavení načtené a soubor už nepotřebuje, nová verze v nové
+konverzaci naběhne rovnou z nového místa. Stačí tak jedna nová konverzace.
+Z kořene vaultu:
+
+1. `.gitignore` podle A1.
+2. Zkopíruj nastavení a zkontroluj ho novou verzí:
+
+   ```sh
+   mkdir -p system && cp .miladka/secrets/whatsapp/config.json system/whatsapp.json
+   .doplnky/mcp-whatsapp/SOUBOR --config system/whatsapp.json --check
+   ```
+3. V `.mcp.json` přepiš u `whatsapp` cestu za `--config` na
+   `system/whatsapp.json` (Accept edits jako v A5). Když má uživatel příkaz
+   hlídače ve vlastních poznámkách, oprav cestu i tam.
+4. Nová konverzace (krok 4), `wa_status`, hlídače spusť s novou cestou (B7).
+5. Až všechno funguje, smaž `.miladka/secrets/whatsapp/`. Předtím ověř, že
+   běžící server čte nové místo: `wa_status` má v `settings.config` cestu
+   `system/whatsapp.json`. Když cokoli selže, vrať v `.mcp.json` starou cestu;
+   starý soubor platí dál.
 
 ### B6. Odpojení
 
@@ -562,7 +643,8 @@ Když cokoli selže, vrať `SOUBOR.old` na původní jméno a řekni to uživate
    - `VAULT/.doplnky/mcp-whatsapp/` i s uloženými zprávami,
    - `VAULT/vstupy/whatsapp/` se staženými médii (co chce zachovat, nejdřív
      přesuň do `zdroje/`),
-   - `VAULT/.miladka/secrets/whatsapp/`,
+   - `VAULT/system/whatsapp.json` (nastavení; u instalace starší než 1.2
+     `VAULT/.miladka/secrets/whatsapp/`),
    - `VAULT/.doplnky/prepis/` jen tehdy, když ho nepoužívá jiný doplněk
      (`system/moduly-instalovane.json`).
 6. Odeber záznam `whatsapp` ze `system/moduly-instalovane.json`.

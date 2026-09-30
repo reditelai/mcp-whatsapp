@@ -49,7 +49,9 @@ skryté podsložce doplňků `<vault>/.doplnky/mcp-whatsapp/` (anglicky
 `.addons`), data výchozí v `data/` vedle binárky, přepis ve sdíleném
 `.doplnky/prepis/`. `.doplnky/` je v `.gitignore`: klíče ani programy do
 zálohy nejdou. Obsidian složky s tečkou nezobrazuje. Konfigurace leží
-v `.miladka/secrets/whatsapp/config.json` (vzor mcp-multi-gmail). Registrace
+ve `system/whatsapp.json` (od 1.2; hesla v ní nejsou, takže se zálohuje
+s vaultem, Karel 30. 9. 2026). Doplněk si pravidla `.gitignore` ověří sám
+a nepředpokládá, že je zařídil balíček nebo jiný doplněk. Registrace
 v `.mcp.json` má cesty relativní ke kořeni vaultu, Claude Code server
 spouští z kořene projektu.
 
