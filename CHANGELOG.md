@@ -5,7 +5,15 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
-- Návod B7, „Hlídač a automatický režim oprávnění": změna popisu prostředí platí hned, v téže konverzaci (ověřeno 30. 9. 2026).
+## [1.2.2] - 2026-10-05
+
+Návod upřesňuje, že doplněné řádky v popisu prostředí automatického režimu platí hned.
+
+- Návod B7, „Hlídač a automatický režim oprávnění": změna popisu prostředí platí hned, v téže konverzaci (ověřeno 30. 9. 2026). Dřív návod říkal, že to dokumentace Claude Code neuvádí.
+
+### Při aktualizaci
+
+- Nastavení se nemění. Stačí vyměnit binárku (návod, Aktualizace).
 
 ## [1.2.1] - 2026-09-30
 
