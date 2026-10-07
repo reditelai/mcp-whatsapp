@@ -22,6 +22,10 @@ import (
 	"github.com/reditelai/mcp-whatsapp/internal/watch"
 )
 
+// release is set by the release build (-ldflags "-X main.release=yes"): only
+// a released binary insists on running inside Miládka.
+var release string
+
 func main() {
 	cfgPath := flag.String("config", "", "cesta ke config.json (povinné)")
 	check := flag.Bool("check", false, "jen zkontroluje konfiguraci a skončí")
@@ -44,6 +48,11 @@ func main() {
 		}
 		fmt.Fprintln(os.Stderr, msg)
 		os.Exit(code)
+	}
+	if release == "yes" {
+		if config.OutsideMiladka() != "" {
+			fail(1, config.MiladkaRequired())
+		}
 	}
 	if *cfgPath == "" {
 		fail(2, "Chybí --config: cesta ke config.json (vzor v config.example.json).")

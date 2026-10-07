@@ -4,11 +4,11 @@ MCP server, přes který asistent čte a posílá zprávy na WhatsAppu.
 
 *[English version: `README.en.md`](README.en.md)*
 
-**Server je stavěný pro [Miládku](https://miladka.cz)**, AI asistentku, která
-běží v Claude Code nad tvým vaultem. Funguje ale s jakýmkoli MCP klientem.
-Návod pro asistenta, jak s tebou server nastavit a jak s ním pracovat, je
-v [`docs/pro-asistenta.md`](docs/pro-asistenta.md). Stavba a rozhodnutí jsou
-v [`SPEC.md`](SPEC.md).
+**Je to doplněk [Miládky](https://miladka.cz)**, AI asistentky, která běží
+v Claude Code nad tvým vaultem, **a běží jen v ní**: vydaný server se spustí
+jen ze složky doplňků Miládky. Návod pro asistenta, jak s tebou server
+nastavit a jak s ním pracovat, je v [`docs/pro-asistenta.md`](docs/pro-asistenta.md).
+Stavba a rozhodnutí jsou v [`SPEC.md`](SPEC.md).
 
 ## Než začneš: riziko pro číslo
 
@@ -54,24 +54,16 @@ Server se propojí s tím WhatsApp účtem, kterým naskenuješ QR kód.
 
 ## Instalace
 
-Binárky pro Windows, macOS a Linux (x64 i ARM) jsou v
-[releasech](https://github.com/reditelai/mcp-whatsapp/releases) spolu se
-`SHA256SUMS`. Nic dalšího se neinstaluje.
+Řekni Miládce: **„Nainstaluj si doplněk WhatsApp."** Postupuje podle
+[návodu pro asistenta](docs/pro-asistenta.md): stáhne program pro tvůj systém
+(binárky pro Windows, macOS a Linux jsou v
+[releasech](https://github.com/reditelai/mcp-whatsapp/releases) se
+`SHA256SUMS`) do své složky `.doplnky/mcp-whatsapp/`, domluví se s tebou na
+nastavení a nechá tě naskenovat QR kód. Program si data dává vedle sebe do
+`data/`, takže se s Miládkou stěhuje jednou složkou.
 
-1. Stáhni binárku pro svůj systém, ověř součet a ulož ji do složky, kde má
-   server bydlet, třeba `~/mcp-whatsapp/`. **Data si dá vedle sebe** do
-   `data/`, takže se stěhuje jednou složkou. S Miládkou je to
-   `<složka Miládky>/.doplnky/mcp-whatsapp/`.
-2. Vytvoř `config.json` podle [`config.example.json`](config.example.json).
-3. Připoj server do Claude Code:
-
-   ```sh
-   claude mcp add whatsapp --scope user -- ~/mcp-whatsapp/mcp-whatsapp-linux-amd64 --config /cesta/ke/config.json
-   ```
-
-4. V nové konverzaci řekni asistentovi, ať WhatsApp spáruje.
-
-S Miládkou to všechno udělá asistent podle `docs/pro-asistenta.md`.
+Mimo složku doplňků Miládky, nebo ve složce bez `.miladka/VERSION`, server
+nenaběhne a odkáže na miladka.cz.
 
 ## Nastavení
 
@@ -97,14 +89,14 @@ S Miládkou to všechno udělá asistent podle `docs/pro-asistenta.md`.
 | `transcription.threads`, `transcription.batch` | vlákna a počet úseků najednou; výchozí 2 a 2 (asi 1,3 GB paměti). Na slabém stroji `batch: 1` |
 | `owner` | tvoje číslo nebo seznam čísel (`+420…`): jen jejich zprávy jsou pro asistenta pokyny; musí být v `read.chats` |
 | `wake` | které nové zprávy asistenta probudí (režim `--wait`): `"owner"` (výchozí), seznam dalších čísel a skupin (budí spolu s tebou), nebo `"all"` |
-| `media_dir` | kam se ukládají fotky, hlasovky a dokumenty; výchozí `data/media`, s Miládkou `vstupy/whatsapp` |
+| `media_dir` | kam se ukládají fotky, hlasovky a dokumenty; výchozí `data/media` vedle programu, Miládka nastavuje `vstupy/whatsapp` |
 | `media_keep_days` | po kolika dnech se stažená média smažou (text a přepis zůstanou); výchozí 30, `0` = nikdy |
 | `data_dir` | kde leží data serveru; výchozí `data/` vedle binárky |
-| `transcription.dir` | engine a model přepisu; výchozí `.doplnky/prepis` (sdílený s dalšími doplňky Miládky), jinde `data/stt` |
+| `transcription.dir` | engine a model přepisu; výchozí `.doplnky/prepis` (sdílený s dalšími doplňky Miládky) |
 
 Čísla vždycky s předvolbou země (`+420777123456`), číslo bez ní server
 odmítne. **Prázdný seznam i chybějící klíč znamená nikam**, ne kamkoli. Relativní
-cesty se v Miládce berou od kořene její složky, jinde od složky s `config.json`.
+cesty se berou od kořene složky Miládky.
 
 V datové složce je `session.db` s klíči spárovaného zařízení. **Kdo má ten
 soubor, má přístup k tvému WhatsAppu.** Nepatří do gitu ani do zálohy.

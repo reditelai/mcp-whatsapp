@@ -1,8 +1,13 @@
 # mcp-whatsapp - specifikace
 
-MCP server, přes který asistent čte a posílá zprávy na WhatsAppu. Stavěný pro
-[Miládku](https://miladka.cz) v Claude Code na Windows, Macu a Linuxu, funguje
-s jakýmkoli MCP klientem.
+MCP server, přes který asistent čte a posílá zprávy na WhatsAppu. Doplněk
+[Miládky](https://miladka.cz) v Claude Code na Windows, Macu a Linuxu.
+
+**Běží jen v Miládce** (Karel 8. 10. 2026). Vydaná binárka (sestavená
+s `-X main.release=yes`) se spustí jen ze složky doplňků (`.doplnky/mcp-whatsapp/`,
+anglicky `.addons/`) ve složce, která má `.miladka/VERSION`; jinde nenaběhne
+a odkáže na miladka.cz. Sestavení ze zdrojového kódu kontrolu nemá, je pro vývoj. Zámek
+je praktický, ne právní: licence zůstává Apache 2.0.
 
 Schválená architektura (Karel, 29. 9. 2026). Vznikla z provozu u Karlovy
 asistentky, kde dva měsíce běžel server `wadb` a 28. 9. 2026 přestal fungovat:

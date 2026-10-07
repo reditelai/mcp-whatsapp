@@ -20,6 +20,8 @@ MCP server, přes který asistent čte a posílá zprávy na WhatsAppu. Stojí n
 
 **7. Knihovna `whatsmeow` se neupravuje, jen aktualizuje.** Je pod MPL: úpravy by se musely zveřejnit a rozešly by se s týdenními aktualizacemi.
 
+**8. Server běží jen v Miládce** (Karel 8. 10. 2026). Vydaná binárka (`-X main.release=yes` v `release.yml`) kontroluje při startu složku doplňků a `.miladka/VERSION` (`internal/config/miladka.go`). Kontrolu neodstraňuj, flag z `release.yml` nevyhazuj a README ani návod nesmí popisovat použití bez Miládky.
+
 ## Co nikdy nesmí do gitu
 
 - **`session.db` a cokoli z datové složky.** Jsou v něm klíče zařízení: kdo je má, má přístup k WhatsAppu.

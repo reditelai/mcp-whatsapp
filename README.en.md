@@ -5,12 +5,13 @@ An MCP server through which an assistant reads and sends WhatsApp messages.
 *[Česká verze: `README.md`](README.md) - the project is Czech-first, so the
 Czech README is the one kept in step with the code.*
 
-**The server is built for [Miladka](https://miladka.cz)**, an AI assistant
-that runs in Claude Code on top of your vault. It works with any MCP client,
-though. The guide telling the assistant how to set the server up with you and
-how to work with it is in [`docs/pro-asistenta.md`](docs/pro-asistenta.md)
-(in Czech; the assistant reads it and talks to you in your language). Design
-and decisions are in [`SPEC.md`](SPEC.md).
+**It is an add-on for [Miladka](https://miladka.cz)**, an AI assistant that
+runs in Claude Code on top of your vault, **and it runs only inside her**: the
+released server starts only from Miladka's add-on folder. The guide telling
+the assistant how to set the server up with you and how to work with it is in
+[`docs/pro-asistenta.md`](docs/pro-asistenta.md) (in Czech; the assistant
+reads it and talks to you in your language). Design and decisions are in
+[`SPEC.md`](SPEC.md).
 
 ## Before you start: the risk to your number
 
@@ -59,24 +60,16 @@ The server links to the WhatsApp account that scans the QR code.
 
 ## Installation
 
-Binaries for Windows, macOS and Linux (x64 and ARM) are in the
-[releases](https://github.com/reditelai/mcp-whatsapp/releases) together with
-`SHA256SUMS`. Nothing else gets installed.
+Tell Miladka: **"Install the WhatsApp add-on."** She follows the
+[assistant guide](docs/pro-asistenta.md): downloads the binary for your system
+(Windows, macOS and Linux binaries are in the
+[releases](https://github.com/reditelai/mcp-whatsapp/releases) with
+`SHA256SUMS`) into her folder `.addons/mcp-whatsapp/`, agrees the settings with
+you and has you scan the QR code. The binary keeps its data next to itself in
+`data/`, so it moves with Miladka as one folder.
 
-1. Download the binary for your system, check the checksum and save it in the
-   folder where the server should live, for example `~/mcp-whatsapp/`. **It
-   keeps its data next to itself** in `data/`, so it moves as one folder. With
-   Miladka it is `<Miladka's folder>/.addons/mcp-whatsapp/`.
-2. Create `config.json` following [`config.example.json`](config.example.json).
-3. Connect the server to Claude Code:
-
-   ```sh
-   claude mcp add whatsapp --scope user -- ~/mcp-whatsapp/mcp-whatsapp-linux-amd64 --config /path/to/config.json
-   ```
-
-4. In a new conversation, ask the assistant to pair WhatsApp.
-
-With Miladka, the assistant does all of this following `docs/pro-asistenta.md`.
+Outside Miladka's add-on folder, or in a folder without `.miladka/VERSION`, the
+server does not start and points to miladka.cz.
 
 ## Settings
 
@@ -102,16 +95,15 @@ With Miladka, the assistant does all of this following `docs/pro-asistenta.md`.
 | `transcription.threads`, `transcription.batch` | threads and segments at once; default 2 and 2 (about 1.3 GB of memory). On a weak machine `batch: 1` |
 | `owner` | your number or a list of numbers (`+420…`): only their messages are instructions for the assistant; must be in `read.chats` |
 | `wake` | which new messages wake the assistant (`--wait` mode): `"owner"` (default), a list of further numbers and groups (they wake along with you), or `"all"` |
-| `media_dir` | where photos, voice notes and documents are saved; default `data/media`, with Miladka `inbox/whatsapp` |
+| `media_dir` | where photos, voice notes and documents are saved; default `data/media` next to the binary, Miladka sets `inbox/whatsapp` |
 | `media_keep_days` | after how many days downloaded media are deleted (text and transcript stay); default 30, `0` = never |
 | `data_dir` | where the server's data lives; default `data/` next to the binary |
-| `transcription.dir` | the transcription engine and model; default `.addons/prepis` (shared with Miladka's other add-ons), elsewhere `data/stt` |
+| `transcription.dir` | the transcription engine and model; default `.addons/prepis` (shared with Miladka's other add-ons) |
 
 Numbers always with the country code (`+420777123456`); the server rejects
 a number without it. **An empty list and a missing key both mean nowhere**,
 not anywhere. Relative
-paths are taken from the root of Miladka's folder when the server lives in
-her add-on folder, elsewhere from the folder of `config.json`.
+paths are taken from the root of Miladka's folder.
 
 The data folder holds `session.db` with the keys of the paired device.
 **Whoever has that file has access to your WhatsApp.** It belongs neither in

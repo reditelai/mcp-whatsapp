@@ -5,6 +5,18 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.3.0] - 2026-10-08
+
+Server je doplněk Miládky a běží jen v její složce.
+
+- Vydaná binárka se spustí jen ze složky doplňků Miládky (`.doplnky/mcp-whatsapp/`, anglicky `.addons/`) ve složce, která má `.miladka/VERSION`. Jinde nenaběhne a česky i anglicky napíše, že je to doplněk Miládky a ať si ji uživatel pořídí na miladka.cz (v režimu `--wait` jako `chyba:` s kódem 6). Kontrolu zapíná release build (`-X main.release=yes`), sestavení ze zdrojového kódu ji nemá (Karel 8. 10. 2026).
+- README jen pro Miládku: pryč „funguje s jakýmkoli MCP klientem" a instalace příkazem `claude mcp add` mimo Miládku. Návod A1 to říká výslovně, aktualizace (B5, krok 0) nejdřív zkontroluje místo.
+
+### Při aktualizaci
+
+- **Ještě před výměnou binárky** ověř místo (návod B5, krok 0): registrace musí ukazovat do `.doplnky/mcp-whatsapp/` a vault musí mít `.miladka/VERSION`, jinak nová verze nenaběhne. Když binárka leží jinde, přesuň ji podle kroku 0 i s `data/`.
+- Nastavení se nemění.
+
 ## [1.2.3] - 2026-10-05
 
 Aktualizace knihovny whatsmeow, aby spojení s WhatsAppem dál fungovalo.
