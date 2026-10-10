@@ -5,6 +5,8 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+- Návod B7: „Accept edits" přepnout **před** příkazem a před zápisem do popisu prostředí zkontrolovat, jestli uživatel podobný řádek už nemá. B5b, krok 5: cesta k nastavení je ve `wa_status` v poli `config`, ne `settings.config` (Věrka 30. 9. 2026).
+
 ## [1.3.0] - 2026-10-08
 
 Server je doplněk Miládky a běží jen v její složce.

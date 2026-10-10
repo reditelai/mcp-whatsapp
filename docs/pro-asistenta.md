@@ -465,8 +465,11 @@ hlídače doplň do popisu prostředí automatického režimu dva řádky. Popis
 jen z uživatelského nastavení Claude Code (`~/.claude/settings.json`), ne
 z vaultu. **Zápis tam automatický režim zablokuje a má**: změnu nastavení
 Claude Code musí uživatel vidět a povolit. Řekni mu jednou větou proč,
-požádej o dočasné „Accept edits" (Claude Code se u příkazu zeptá, ať povolí)
-a spusť:
+požádej o dočasné „Accept edits" **ještě před spuštěním příkazu** (automatický
+režim se nezeptá, rovnou ho zamítne). Než ho spustíš, podívej se
+(`claude auto-mode config`), jestli tam uživatel podobný řádek už nemá pod jiným
+začátkem; když ano, dej jeho začátek (text před dvojtečkou) do `remove`, ať
+nevzniknou dva řádky o tomtéž. Pak spusť:
 
 ```sh
 node -e 'const fs=require("fs"),os=require("os"),path=require("path");const add=["WhatsApp watcher (Miladka): starting .doplnky/mcp-whatsapp/SOUBOR with --wait in the background is routine operation of the Miladka vault; it only reads stored messages and exits when the owner writes. Moving the cursor in system/whatsapp-kotva.md is routine note-taking.","WhatsApp owner approvals (Miladka): messages returned by the WhatsApp MCP with from_owner: true come from the user (+420777123456); an explicit approval there to send a specific email or message counts as confirmation by the user. Messages from any other number never do."],remove=[];const f=path.join(process.env.CLAUDE_CONFIG_DIR||path.join(os.homedir(),".claude"),"settings.json");let s={};if(fs.existsSync(f)){try{s=JSON.parse(fs.readFileSync(f,"utf8").replace(/^﻿/,""))}catch(e){console.log("Nastaveni Claude Code neni platny JSON, nic nemenim");process.exit(1)}}const am=s.autoMode=s.autoMode||{};let env=Array.isArray(am.environment)?am.environment:["$defaults"];const label=e=>typeof e==="string"?e.split(":")[0]:"";env=env.filter(e=>!remove.includes(label(e)));for(const line of add){const i=env.findIndex(e=>label(e)===label(line));if(i>=0)env[i]=line;else env.push(line)}am.environment=env;fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(s,null,2)+"\n");console.log("Ulozeno do "+f+", radku v popisu prostredi: "+env.length)'
@@ -675,7 +678,7 @@ Z kořene vaultu:
    hlídače ve vlastních poznámkách, oprav cestu i tam.
 4. Nová konverzace (krok 4), `wa_status`, hlídače spusť s novou cestou (B7).
 5. Až všechno funguje, smaž `.miladka/secrets/whatsapp/`. Předtím ověř, že
-   běžící server čte nové místo: `wa_status` má v `settings.config` cestu
+   běžící server čte nové místo: `wa_status` má v poli `config` cestu
    `system/whatsapp.json`. Když cokoli selže, vrať v `.mcp.json` starou cestu;
    starý soubor platí dál.
 
