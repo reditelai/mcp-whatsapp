@@ -5,6 +5,16 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.3.2] - 2026-10-12
+
+Aktualizace knihovny whatsmeow, aby spojení s WhatsAppem dál fungovalo.
+
+- whatsmeow v0.0.0-20261007111105-c386243a72ba.
+
+### Při aktualizaci
+
+- Nastavení se nemění. Stačí vyměnit binárku (návod, Aktualizace).
+
 ## [1.3.1] - 2026-10-10
 
 Oprava návodu: „Accept edits" přepnout před příkazem, nezapsat do popisu prostředí řádek, který už tam je, a správná cesta k nastavení ve `wa_status`.

@@ -6,7 +6,7 @@ require (
 	github.com/gofrs/flock v0.13.1
 	github.com/mark3labs/mcp-go v1.1.1
 	github.com/pion/opus v0.1.0
-	go.mau.fi/whatsmeow v0.0.0-20261005123207-68df7a5ec7b5
+	go.mau.fi/whatsmeow v0.0.0-20261007111105-c386243a72ba
 	google.golang.org/protobuf v1.36.12
 	modernc.org/sqlite v1.60.1
 	rsc.io/qr v0.2.0
