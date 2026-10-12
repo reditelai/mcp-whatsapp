@@ -5,6 +5,21 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.3.3] - 2026-10-13
+
+Návod se ptá jen na volby uživatele, technické kroky dělá sám a na čísle uživatele se ptá, od koho chce zprávy hned.
+
+- Návod: místo „server v `/mcp` nenaběhne" chybějící nástroje `wa_...`; v aplikaci Claude `/mcp` nefunguje (Karel 13. 10. 2026).
+- Návod: na začátku nastavení „Na co se ptáš a co uděláš sama“. Ptá se jen na volby uživatele (způsob, čtení, psaní, od koho zprávy hned, média, historie, přepis), hook, řádky automatického režimu, kotvu a zápis instalace udělá bez ptaní a bez vlastních skriptů, a neslibuje, co neověřila. Nový bod „Od koho chceš zprávy hned?“ pro oba režimy; na čísle uživatele povinný a hlášení do chatu Miládky (Karlův test 13. 10. 2026).
+- Návod, domluva o nastavení: u Miládky na čísle uživatele se na číslo majitele neptá a bod o pokynech vynechá (`owner` se tam nevyplňuje). Dosud věta „číslo majitele potřebuješ vždycky“ platila zdánlivě pro oba režimy a Miládka se ptala (Karlův test 13. 10. 2026).
+- Návod: řádky popisu prostředí se zapisují skriptem z `.miladka/automaticky-rezim.md` (Mac `osascript`, Windows PowerShell), ne `node -e`. WhatsApp Node nepotřebuje, na čistém počítači by příkaz selhal.
+- Návod: na začátku poznámka, že uživateli „složka Miládky", ne „vault", a že se návod čte celý ze staženého souboru, ne nástrojem na čtení webu (Karlův test 11. 10. 2026).
+
+### Při aktualizaci
+
+- Nastavení se nemění.
+- Když je Miládka na čísle uživatele (bez `owner`) a `wake` nemá seznam lidí, zeptej se ho, od koho chce zprávy hned (návod A3, bod 6), a se souhlasem seznam doplň.
+
 ## [1.3.2] - 2026-10-12
 
 Aktualizace knihovny whatsmeow, aby spojení s WhatsAppem dál fungovalo.
