@@ -103,7 +103,7 @@ soubor, má přístup k tvému WhatsAppu.** Nepatří do gitu ani do zálohy.
 
 ## Licence
 
-Apache-2.0, viz [`LICENSE`](LICENSE). Server vychází z částí
+PolyForm Shield 1.0.0, viz [LICENSE](LICENSE). Kód je veřejný, abyste si mohli ověřit, co doplněk dělá. Smíte ho používat, upravovat i sdílet, jen z něj nesmíte udělat produkt, který konkuruje Miládce. Starší verze vyšly pod Apache 2.0 a pod ní zůstávají. Server vychází z částí
 [wadb](https://github.com/sausheong/wadb) (MIT, upozornění v
 [`NOTICE`](NOTICE)). Knihovna [whatsmeow](https://github.com/tulir/whatsmeow)
 je závislost pod MPL-2.0, její zdrojový kód je na GitHubu autora. Přepis

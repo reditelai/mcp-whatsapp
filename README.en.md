@@ -111,7 +111,7 @@ git nor in a backup.
 
 ## License
 
-Apache-2.0, see [`LICENSE`](LICENSE). The server builds on parts of
+PolyForm Shield 1.0.0, see [LICENSE](LICENSE). The code is public so you can check what the add-on does. You may use, modify and share it, but not build a product that competes with Miládka. Earlier versions were released under Apache 2.0 and remain under it. The server builds on parts of
 [wadb](https://github.com/sausheong/wadb) (MIT, notice in
 [`NOTICE`](NOTICE)). The [whatsmeow](https://github.com/tulir/whatsmeow)
 library is a dependency under MPL-2.0; its source code is on its author's

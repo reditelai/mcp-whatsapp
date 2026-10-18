@@ -7,7 +7,7 @@ MCP server, přes který asistent čte a posílá zprávy na WhatsAppu. Doplněk
 s `-X main.release=yes`) se spustí jen ze složky doplňků (`.doplnky/mcp-whatsapp/`,
 anglicky `.addons/`) ve složce, která má `.miladka/VERSION`; jinde nenaběhne
 a odkáže na miladka.cz. Sestavení ze zdrojového kódu kontrolu nemá, je pro vývoj. Zámek
-je praktický, ne právní: licence zůstává Apache 2.0.
+je praktický, ne právní: licenci určuje `LICENSE` (PolyForm Shield 1.0.0, Karel 18. 10. 2026).
 
 Schválená architektura (Karel, 29. 9. 2026). Vznikla z provozu u Karlovy
 asistentky, kde dva měsíce běžel server `wadb` a 28. 9. 2026 přestal fungovat:
