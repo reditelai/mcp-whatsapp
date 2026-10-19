@@ -5,7 +5,16 @@ Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 
 ## [Nevydáno]
 
+## [1.3.4] - 2026-10-19
+
+Aktualizace knihovny whatsmeow, aby spojení s WhatsAppem dál fungovalo, a nová licence.
+
+- whatsmeow v0.0.0-20261017175727-b2b1e71d45e2.
 - Licence je od této verze PolyForm Shield 1.0.0 místo Apache 2.0 a autorská práva má Evermind Technologies s.r.o. Starší verze zůstávají pod Apache 2.0.
+
+### Při aktualizaci
+
+- Nastavení se nemění. Stačí vyměnit binárku (návod, Aktualizace).
 
 ## [1.3.3] - 2026-10-13
 
